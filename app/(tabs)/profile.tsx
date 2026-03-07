@@ -1,13 +1,18 @@
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import * as Updates from 'expo-updates';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Linking,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,17 +21,51 @@ import { BorderRadius, Colors, Spacing, StatusColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
 import { useAuth } from '@/store/AuthContext';
+import { useTheme } from '@/store/ThemeContext';
+import { useToast } from '@/store/ToastContext';
+
+// ─── App Update System (OTA via expo-updates + changelog from version.json) ───
+const APP_VERSION = '1.0.0';
+const CHANGELOG_URL = 'https://raw.githubusercontent.com/FaroukMBen/chrollomark/main/version.json';
+
+interface UpdateInfo {
+  version: string;
+  changelog: string[];
+  downloadUrl: string;
+  mandatory: boolean;
+  isOTA?: boolean; // true when detected via expo-updates
+}
 
 export default function ProfileScreen() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, updateUser } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
+  const { themeMode, setThemeMode } = useTheme();
 
   const [stats, setStats] = useState<any>(null);
   const [collections, setCollections] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const { showToast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editUsername, setEditUsername] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editAvatar, setEditAvatar] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Update system
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [applyingUpdate, setApplyingUpdate] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setEditUsername(user.username);
+      setEditBio(user.bio || '');
+      setEditAvatar(user.avatar || null);
+    }
+  }, [user]);
 
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -39,8 +78,6 @@ export default function ProfileScreen() {
       setCollections(collectionsData);
     } catch (error) {
       console.log('Error:', error);
-    } finally {
-      setIsLoading(false);
     }
   }, [isAuthenticated]);
 
@@ -52,6 +89,89 @@ export default function ProfileScreen() {
     setRefreshing(false);
   };
 
+  const checkForUpdates = async () => {
+    setCheckingUpdate(true);
+    try {
+      // Try OTA update first (works in production builds)
+      if (!__DEV__) {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          // Fetch changelog from version.json
+          let changelog: string[] = [];
+          let version = 'New';
+          try {
+            const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
+            const data = await r.json();
+            changelog = data.changelog || [];
+            version = data.version || 'New';
+          } catch { /* no changelog available */ }
+          setUpdateInfo({ version, changelog, downloadUrl: '', mandatory: false, isOTA: true });
+          setCheckingUpdate(false);
+          return;
+        }
+      }
+
+      // Fallback: check version.json for APK updates or in dev mode
+      const response = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
+      if (!response.ok) throw new Error('Network error');
+      const data: UpdateInfo = await response.json();
+      if (data.version && data.version !== APP_VERSION) {
+        setUpdateInfo({ ...data, isOTA: false });
+      } else {
+        showToast({ message: 'You are on the latest version!', type: 'success' });
+        setUpdateInfo(null);
+      }
+    } catch {
+      // In dev mode, version.json might not exist on GitHub yet
+      showToast({ message: __DEV__ ? 'Update check skipped in dev mode' : 'Could not check for updates', type: 'error' });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const applyOTAUpdate = async () => {
+    setApplyingUpdate(true);
+    try {
+      await Updates.fetchUpdateAsync();
+      Alert.alert('Update Ready', 'The app will restart to apply the update.', [
+        { text: 'Restart Now', onPress: () => Updates.reloadAsync() },
+      ]);
+    } catch (e: any) {
+      showToast({ message: `Update failed: ${e.message}`, type: 'error' });
+    } finally {
+      setApplyingUpdate(false);
+    }
+  };
+
+  // Auto-check on mount (silent, no error toast)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    (async () => {
+      try {
+        if (!__DEV__) {
+          const update = await Updates.checkForUpdateAsync();
+          if (update.isAvailable) {
+            let changelog: string[] = [];
+            let version = 'New';
+            try {
+              const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
+              const d = await r.json();
+              changelog = d.changelog || [];
+              version = d.version || 'New';
+            } catch { /* */ }
+            setUpdateInfo({ version, changelog, downloadUrl: '', mandatory: false, isOTA: true });
+            return;
+          }
+        }
+        const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
+        const data = await r.json();
+        if (data.version && data.version !== APP_VERSION) {
+          setUpdateInfo({ ...data, isOTA: false });
+        }
+      } catch { /* silent */ }
+    })();
+  }, [isAuthenticated]);
+
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
@@ -59,17 +179,82 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const handleSync = async () => {
+    try {
+      const count = await api.syncMutations();
+      showToast({ message: `Synced ${count} changes!`, type: 'success' });
+      await loadData();
+    } catch (e: any) {
+      showToast({ message: `Sync failed: ${e.message}`, type: 'error' });
+    }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      setEditAvatar(result.assets[0].uri);
+    }
+  };
+
+  const saveProfile = async () => {
+    setIsSaving(true);
+    try {
+      const formData = new FormData();
+      if (editUsername !== user?.username) formData.append('username', editUsername.trim());
+      if (editBio !== user?.bio) formData.append('bio', editBio.trim());
+
+      if (editAvatar && editAvatar !== user?.avatar) {
+        if (editAvatar.startsWith('file://') || editAvatar.startsWith('content://')) {
+          const filename = editAvatar.split('/').pop() || 'avatar.jpg';
+          const match = /\.(\w+)$/.exec(filename);
+          const fileType = match ? `image/${match[1]}` : 'image';
+          // @ts-ignore
+          formData.append('avatar', { uri: editAvatar, name: filename, type: fileType });
+        } else {
+          formData.append('avatar', editAvatar.trim());
+        }
+      }
+
+      const updatedUser = await api.updateProfile(formData);
+      updateUser(updatedUser);
+      setIsEditing(false);
+      showToast({ message: 'Profile updated!', type: 'success' });
+    } catch (error: any) {
+      showToast({ message: error.message, type: 'error' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const completionRate = stats && stats.totalStories > 0
+    ? Math.round((stats.completed / stats.totalStories) * 100)
+    : 0;
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.center}>
+          <IconSymbol name="person.crop.circle" size={64} color={colors.textSecondary} />
+          <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome to ChrolloMark</Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Sign in to view your profile
+            Sign in to track your reading progress, connect with friends, and more
           </Text>
         </View>
       </SafeAreaView>
     );
   }
+
+  const overviewStats = [
+    { label: 'Chapters', value: stats?.totalChaptersRead ?? 0, color: colors.primary },
+    { label: 'Favorites', value: stats?.favorites ?? 0, color: colors.accent },
+    { label: 'Completion', value: `${completionRate}%`, color: colors.success },
+    { label: 'This Week', value: stats?.readThisWeek ?? 0, color: colors.error },
+  ];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -77,85 +262,175 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header */}
-        <View style={styles.profileHeader}>
-          <View style={[styles.largeAvatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.largeAvatarText}>
-              {user?.username?.[0]?.toUpperCase()}
-            </Text>
-          </View>
-          <Text style={[styles.profileName, { color: colors.text }]}>{user?.username}</Text>
-          <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{user?.email}</Text>
-          {user?.bio ? (
-            <Text style={[styles.profileBio, { color: colors.textSecondary }]}>{user.bio}</Text>
-          ) : null}
-        </View>
 
-        {/* Stats Grid */}
-        {stats && (
-          <View style={styles.statsGrid}>
-            {[
-              { label: 'Total', value: stats.totalStories, color: colors.text },
-              { label: 'Reading', value: stats.reading, color: StatusColors.Reading },
-              { label: 'Completed', value: stats.completed, color: StatusColors.Completed },
-              { label: 'Planned', value: stats.planToRead, color: StatusColors['Plan to Read'] },
-              { label: 'On Hold', value: stats.onHold, color: StatusColors['On Hold'] },
-              { label: 'Dropped', value: stats.dropped, color: StatusColors.Dropped },
-            ].map((stat) => (
-              <View key={stat.label} style={[styles.statItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{stat.label}</Text>
+        {/* ─── PROFILE HEADER ─── */}
+        <View style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <View style={styles.profileTop}>
+            {isEditing ? (
+              <TouchableOpacity onPress={pickImage} style={[styles.avatar, { backgroundColor: colors.primary }]}>
+                {editAvatar ? (
+                  <Image source={{ uri: editAvatar }} style={styles.avatarImage} contentFit="cover" />
+                ) : (
+                  <IconSymbol name="photo" size={28} color="#FFF" />
+                )}
+                <View style={[styles.editBadge, { backgroundColor: colors.accent }]}>
+                  <IconSymbol name="pencil" size={10} color="#FFF" />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+                {user?.avatar ? (
+                  <Image source={{ uri: user.avatar }} style={styles.avatarImage} contentFit="cover" />
+                ) : (
+                  <Text style={styles.avatarText}>{user?.username?.[0]?.toUpperCase()}</Text>
+                )}
               </View>
-            ))}
-          </View>
-        )}
+            )}
 
-        {/* Big Stats */}
-        {stats && (
-          <View style={[styles.bigStatCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            <View style={styles.bigStatRow}>
-              <View style={styles.bigStat}>
-                <Text style={[styles.bigStatValue, { color: colors.accent }]}>
-                  {stats.totalChaptersRead}
-                </Text>
-                <Text style={[styles.bigStatLabel, { color: colors.textSecondary }]}>
-                  Total Chapters Read
-                </Text>
-              </View>
-              <View style={styles.bigStat}>
-                <Text style={[styles.bigStatValue, { color: colors.error }]}>
-                  {stats.favorites}
-                </Text>
-                <Text style={[styles.bigStatLabel, { color: colors.textSecondary }]}>
-                  Favorites
-                </Text>
-              </View>
-              <View style={styles.bigStat}>
-                <Text style={[styles.bigStatValue, { color: colors.success }]}>
-                  {stats.readThisWeek}
-                </Text>
-                <Text style={[styles.bigStatLabel, { color: colors.textSecondary }]}>
-                  Read This Week
-                </Text>
-              </View>
+            <View style={styles.profileInfo}>
+              {isEditing ? (
+                <TextInput
+                  style={[styles.editInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text }]}
+                  value={editUsername}
+                  onChangeText={setEditUsername}
+                  placeholder="Username"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              ) : (
+                <>
+                  <Text style={[styles.profileName, { color: colors.text }]}>{user?.username}</Text>
+                  <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{user?.email}</Text>
+                </>
+              )}
             </View>
           </View>
+
+          {isEditing ? (
+            <View style={styles.editSection}>
+              <TextInput
+                style={[styles.editInput, styles.textArea, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text }]}
+                value={editBio}
+                onChangeText={setEditBio}
+                placeholder="Write a short bio..."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+              />
+              <View style={styles.editActions}>
+                <TouchableOpacity style={[styles.editBtn, { borderColor: colors.border }]} onPress={() => setIsEditing(false)}>
+                  <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={saveProfile}>
+                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <>
+              {user?.bio ? <Text style={[styles.bio, { color: colors.textSecondary }]}>{user.bio}</Text> : null}
+              <TouchableOpacity style={[styles.editProfileBtn, { borderColor: colors.primary + '40' }]} onPress={() => setIsEditing(true)}>
+                <IconSymbol name="pencil" size={13} color={colors.primary} />
+                <Text style={[styles.editProfileText, { color: colors.primary }]}>Edit Profile</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* ─── STATS OVERVIEW (fixed 4-column grid) ─── */}
+        {stats && (
+          <>
+            <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              {overviewStats.map((stat, i) => (
+                <React.Fragment key={stat.label}>
+                  {i > 0 && <View style={[styles.overviewDivider, { backgroundColor: colors.border }]} />}
+                  <View style={styles.overviewStat}>
+                    <Text style={[styles.overviewValue, { color: stat.color }]}>{stat.value}</Text>
+                    <Text style={[styles.overviewLabel, { color: colors.textSecondary }]}>{stat.label}</Text>
+                  </View>
+                </React.Fragment>
+              ))}
+            </View>
+
+            {/* Status Grid */}
+            <View style={styles.statusGrid}>
+              {[
+                { label: 'Total', value: stats.totalStories, color: colors.text, icon: 'book.fill' as const },
+                { label: 'Reading', value: stats.reading, color: StatusColors.Reading, icon: 'book.fill' as const },
+                { label: 'Completed', value: stats.completed, color: StatusColors.Completed, icon: 'checkmark.circle.fill' as const },
+                { label: 'Planned', value: stats.planToRead, color: StatusColors['Plan to Read'], icon: 'bookmark.fill' as const },
+                { label: 'On Hold', value: stats.onHold, color: StatusColors['On Hold'], icon: 'pause.circle.fill' as const },
+                { label: 'Dropped', value: stats.dropped, color: StatusColors.Dropped, icon: 'xmark.circle.fill' as const },
+              ].map((stat) => (
+                <View key={stat.label} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                  <View style={[styles.statIconBg, { backgroundColor: stat.color + '15' }]}>
+                    <IconSymbol name={stat.icon} size={14} color={stat.color} />
+                  </View>
+                  <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+          </>
         )}
 
-        {/* Collections */}
+        {/* ─── UPDATE AVAILABLE ─── */}
+        {updateInfo && (
+          <View style={[styles.updateCard, { backgroundColor: '#FF674015', borderColor: '#FF6740' }]}>
+            <View style={styles.updateHeader}>
+              <View style={styles.updateTitleRow}>
+                <IconSymbol name="sparkles" size={18} color="#FF6740" />
+                <Text style={[styles.updateTitle, { color: colors.text }]}>Update Available</Text>
+              </View>
+              <View style={[styles.versionBadge, { backgroundColor: '#FF674025' }]}>
+                <Text style={styles.versionText}>v{updateInfo.version}</Text>
+              </View>
+            </View>
+            {updateInfo.changelog?.length > 0 && (
+              <View style={styles.changelogList}>
+                {updateInfo.changelog.map((item, i) => (
+                  <View key={i} style={styles.changelogItem}>
+                    <Text style={[styles.changelogBullet, { color: '#FF6740' }]}>•</Text>
+                    <Text style={[styles.changelogText, { color: colors.textSecondary }]}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.updateBtn, { backgroundColor: '#FF6740', opacity: applyingUpdate ? 0.6 : 1 }]}
+              disabled={applyingUpdate}
+              onPress={() => {
+                if (updateInfo.isOTA) {
+                  applyOTAUpdate();
+                } else if (updateInfo.downloadUrl) {
+                  Linking.openURL(updateInfo.downloadUrl);
+                }
+              }}>
+              <IconSymbol name={updateInfo.isOTA ? 'arrow.down.circle' : 'arrow.up.right'} size={14} color="#FFF" />
+              <Text style={styles.updateBtnText}>
+                {applyingUpdate ? 'Downloading...' : updateInfo.isOTA ? 'Apply Update' : 'Download Update'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ─── COLLECTIONS ─── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>📁 My Collections</Text>
-            <TouchableOpacity onPress={() => router.push('/collection/create')}>
-              <IconSymbol name="plus.circle.fill" size={24} color={colors.primary} />
+            <View style={styles.sectionTitleRow}>
+              <IconSymbol name="folder.fill" size={16} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>My Collections</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.newCollectionBtn, { backgroundColor: colors.primary + '15' }]}
+              onPress={() => router.push('/collection/create')}>
+              <IconSymbol name="plus" size={12} color={colors.primary} />
+              <Text style={[styles.newCollectionText, { color: colors.primary }]}>New</Text>
             </TouchableOpacity>
           </View>
 
           {collections.length === 0 ? (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                No collections yet
-              </Text>
+              <IconSymbol name="folder" size={28} color={colors.textSecondary} />
+              <Text style={[styles.emptyCardText, { color: colors.textSecondary }]}>No collections yet</Text>
             </View>
           ) : (
             collections.map((collection) => (
@@ -165,26 +440,84 @@ export default function ProfileScreen() {
                 onPress={() => router.push(`/collection/${collection._id}` as any)}>
                 <View style={[styles.collectionColor, { backgroundColor: collection.color || colors.primary }]} />
                 <View style={styles.collectionInfo}>
-                  <Text style={[styles.collectionName, { color: colors.text }]}>
-                    {collection.name}
-                  </Text>
+                  <Text style={[styles.collectionName, { color: colors.text }]}>{collection.name}</Text>
                   <Text style={[styles.collectionCount, { color: colors.textSecondary }]}>
-                    {collection.stories.length} stories
-                    {collection.isPublic ? ' • Public' : ' • Private'}
+                    {collection.stories.length} stories{collection.isPublic ? ' · Public' : ''}
                   </Text>
                 </View>
-                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+                <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
               </TouchableOpacity>
             ))
           )}
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity
-          style={[styles.logoutButton, { borderColor: colors.error }]}
-          onPress={handleLogout}>
-          <Text style={[styles.logoutText, { color: colors.error }]}>Logout</Text>
-        </TouchableOpacity>
+        {/* ─── SETTINGS ─── */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <IconSymbol name="gear" size={16} color={colors.text} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Settings</Text>
+          </View>
+
+          {/* Appearance */}
+          <View style={[styles.settingCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <View style={styles.settingHeader}>
+              <IconSymbol name="paintbrush.fill" size={15} color={colors.primary} />
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Appearance</Text>
+            </View>
+            <View style={styles.themeOptions}>
+              {([['light', 'sun.max.fill', 'Light'], ['dark', 'moon.fill', 'Dark'], ['system', 'gear', 'System']] as const).map(([mode, icon, label]) => (
+                <TouchableOpacity
+                  key={mode}
+                  style={[styles.themeOption, {
+                    backgroundColor: themeMode === mode ? colors.primary + '15' : 'transparent',
+                    borderColor: themeMode === mode ? colors.primary : colors.border,
+                  }]}
+                  onPress={() => setThemeMode(mode)}>
+                  <IconSymbol name={icon as any} size={16} color={themeMode === mode ? colors.primary : colors.textSecondary} />
+                  <Text style={[styles.themeText, { color: themeMode === mode ? colors.primary : colors.textSecondary }]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Check for Updates */}
+          <TouchableOpacity
+            style={[styles.settingCard, styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={checkForUpdates}
+            disabled={checkingUpdate}>
+            <View style={styles.settingHeader}>
+              <IconSymbol name="sparkles" size={15} color="#FF6740" />
+              <Text style={[styles.settingLabel, { color: colors.text }]}>
+                {checkingUpdate ? 'Checking...' : 'Check for Updates'}
+              </Text>
+            </View>
+            <Text style={[styles.versionLabel, { color: colors.textSecondary }]}>v{APP_VERSION}</Text>
+          </TouchableOpacity>
+
+          {/* Sync */}
+          <TouchableOpacity
+            style={[styles.settingCard, styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={handleSync}>
+            <View style={styles.settingHeader}>
+              <IconSymbol name="arrow.triangle.2.circlepath" size={15} color={colors.success} />
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Sync Offline Changes</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          {/* Logout */}
+          <TouchableOpacity
+            style={[styles.settingCard, styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.error + '20' }]}
+            onPress={handleLogout}>
+            <View style={styles.settingHeader}>
+              <IconSymbol name="rectangle.portrait.and.arrow.right" size={15} color={colors.error} />
+              <Text style={[styles.settingLabel, { color: colors.error }]}>Logout</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={14} color={colors.error} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -192,91 +525,194 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xl },
+  welcomeTitle: { fontSize: 22, fontWeight: '800', marginTop: Spacing.lg, marginBottom: Spacing.sm },
   scrollContent: { paddingBottom: 100 },
-  profileHeader: {
-    alignItems: 'center',
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.lg,
+
+  // Profile Card
+  profileCard: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
   },
-  largeAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  profileTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  avatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.md,
   },
-  largeAvatarText: { color: '#FFF', fontSize: 32, fontWeight: '800' },
-  profileName: { fontSize: 24, fontWeight: '800', marginBottom: 4 },
-  profileEmail: { fontSize: 14, marginBottom: Spacing.sm },
-  profileBio: { fontSize: 14, textAlign: 'center', paddingHorizontal: Spacing.xl },
-  statsGrid: {
+  avatarImage: { width: '100%', height: '100%', borderRadius: 34 },
+  avatarText: { color: '#FFF', fontSize: 26, fontWeight: '800' },
+  editBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  profileInfo: { flex: 1 },
+  profileName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  profileEmail: { fontSize: 12, marginTop: 2, fontWeight: '500' },
+  bio: { fontSize: 13, marginTop: Spacing.md, lineHeight: 18 },
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    marginTop: Spacing.md,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  editProfileText: { fontSize: 12, fontWeight: '700' },
+  editSection: { marginTop: Spacing.md, gap: Spacing.sm },
+  editInput: { padding: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, fontSize: 14 },
+  textArea: { minHeight: 70, textAlignVertical: 'top' },
+  editActions: { flexDirection: 'row', gap: Spacing.sm },
+  editBtn: { flex: 1, padding: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, alignItems: 'center' },
+
+  // Overview Card — fixed uniform grid
+  overviewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+  },
+  overviewStat: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overviewValue: { fontSize: 20, fontWeight: '800', textAlign: 'center' },
+  overviewLabel: { fontSize: 9, fontWeight: '700', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center' },
+  overviewDivider: { width: 1, height: 28 },
+
+  // Status Grid
+  statusGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: Spacing.lg,
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    marginTop: Spacing.md,
   },
-  statItem: {
-    width: '31%',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+  statCard: {
+    flexBasis: '30%',
+    flexGrow: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: 4,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     borderWidth: 1,
+    gap: 3,
   },
-  statValue: { fontSize: 20, fontWeight: '800' },
-  statLabel: { fontSize: 11, marginTop: 2, fontWeight: '500' },
-  bigStatCard: {
+  statIconBg: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  statValue: { fontSize: 16, fontWeight: '800' },
+  statLabel: { fontSize: 9, fontWeight: '600' },
+
+  // Update Card
+  updateCard: {
     marginHorizontal: Spacing.lg,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    marginBottom: Spacing.lg,
   },
-  bigStatRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  bigStat: { alignItems: 'center' },
-  bigStatValue: { fontSize: 24, fontWeight: '800' },
-  bigStatLabel: { fontSize: 11, marginTop: 4, textAlign: 'center' },
-  section: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg },
-  sectionHeader: {
+  updateHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700' },
+  updateTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  updateTitle: { fontSize: 15, fontWeight: '700' },
+  versionBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full },
+  versionText: { color: '#FF6740', fontSize: 11, fontWeight: '700' },
+  changelogList: { gap: 4, marginBottom: Spacing.sm },
+  changelogItem: { flexDirection: 'row', gap: 6, paddingRight: Spacing.md },
+  changelogBullet: { fontSize: 14, fontWeight: '700' },
+  changelogText: { fontSize: 12, lineHeight: 17, flex: 1 },
+  updateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
+  },
+  updateBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+
+  // Section
+  section: { paddingHorizontal: Spacing.lg, marginTop: Spacing.xl },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  newCollectionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+  },
+  newCollectionText: { fontSize: 11, fontWeight: '700' },
+
+  // Collection Cards
   collectionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     marginBottom: Spacing.sm,
     borderWidth: 1,
   },
-  collectionColor: {
-    width: 6,
-    height: 36,
-    borderRadius: 3,
-    marginRight: Spacing.md,
-  },
+  collectionColor: { width: 4, height: 28, borderRadius: 2, marginRight: Spacing.md },
   collectionInfo: { flex: 1 },
-  collectionName: { fontSize: 15, fontWeight: '700' },
-  collectionCount: { fontSize: 12, marginTop: 2 },
+  collectionName: { fontSize: 14, fontWeight: '700' },
+  collectionCount: { fontSize: 11, marginTop: 2, fontWeight: '500' },
+
+  // Empty
   emptyCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     borderWidth: 1,
+    gap: 6,
   },
-  emptyText: { fontSize: 14, textAlign: 'center' },
-  logoutButton: {
-    marginHorizontal: Spacing.lg,
+  emptyCardText: { fontSize: 13, fontWeight: '600' },
+  emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+
+  // Settings
+  settingCard: {
     padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  actionCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  settingHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  settingLabel: { fontSize: 13, fontWeight: '600' },
+  versionLabel: { fontSize: 12, fontWeight: '500' },
+  themeOptions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  themeOption: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    alignItems: 'center',
-    marginTop: Spacing.md,
+    gap: 4,
   },
-  logoutText: { fontSize: 15, fontWeight: '700' },
+  themeText: { fontSize: 11, fontWeight: '600' },
 });
