@@ -1,19 +1,20 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { BorderRadius, Colors, Shadows, Spacing } from '@/constants/theme';
+import { BorderRadius, Colors, Shadows, Spacing, StatusColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
 import { useAuth } from '@/store/AuthContext';
@@ -26,21 +27,25 @@ export default function HomeScreen() {
 
   const [stats, setStats] = useState<any>(null);
   const [currentlyReading, setCurrentlyReading] = useState<any[]>([]);
-  const [activity, setActivity] = useState<any[]>([]);
+  const [recentlyUpdated, setRecentlyUpdated] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const [statsData, progressData, activityData] = await Promise.all([
+      const [statsData, readingData, allProgressData] = await Promise.all([
         api.getProgressStats(),
         api.getMyProgress({ status: 'Reading' }),
-        api.getFriendsActivity().catch(() => []),
+        api.getMyProgress({}),
       ]);
       setStats(statsData);
-      setCurrentlyReading(progressData.slice(0, 6));
-      setActivity(activityData.slice(0, 10));
+      setCurrentlyReading(readingData.slice(0, 8));
+      // Show recently completed or updated
+      const sorted = allProgressData
+        .filter((p: any) => p.status !== 'Reading')
+        .slice(0, 5);
+      setRecentlyUpdated(sorted);
     } catch (error) {
       console.log('Error loading home data:', error);
     } finally {
@@ -48,9 +53,7 @@ export default function HomeScreen() {
     }
   }, [isAuthenticated]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -62,19 +65,23 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.welcomeContainer}>
-          <Text style={[styles.logo, { color: colors.primary }]}>📖</Text>
+          <View style={[styles.logoBg, { backgroundColor: colors.primary + '15' }]}>
+            <IconSymbol name="book.fill" size={48} color={colors.primary} />
+          </View>
           <Text style={[styles.appName, { color: colors.text }]}>ChrolloMark</Text>
           <Text style={[styles.tagline, { color: colors.textSecondary }]}>
-            Track your manga & webtoon reading progress
+            Track your manga & webtoon{'\n'}reading progress
           </Text>
           <TouchableOpacity
             style={[styles.authButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/auth/login')}>
+            onPress={() => router.push('/auth/login')}
+            activeOpacity={0.8}>
             <Text style={styles.authButtonText}>Sign In</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.authButtonOutline, { borderColor: colors.primary }]}
-            onPress={() => router.push('/auth/register')}>
+            onPress={() => router.push('/auth/register')}
+            activeOpacity={0.8}>
             <Text style={[styles.authButtonOutlineText, { color: colors.primary }]}>
               Create Account
             </Text>
@@ -92,21 +99,29 @@ export default function HomeScreen() {
     );
   }
 
+  const statCards = [
+    { label: 'Reading', value: stats?.reading ?? 0, color: StatusColors.Reading, icon: 'book.fill' as const },
+    { label: 'Completed', value: stats?.completed ?? 0, color: StatusColors.Completed, icon: 'checkmark.circle.fill' as const },
+    { label: 'Chapters', value: stats?.totalChaptersRead ?? 0, color: colors.accent, icon: 'doc.text.fill' as const },
+    { label: 'Planned', value: stats?.planToRead ?? 0, color: StatusColors['Plan to Read'], icon: 'bookmark.fill' as const },
+  ];
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={styles.scrollContent}>
+
         {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={[styles.greeting, { color: colors.textSecondary }]}>Welcome back,</Text>
-            <Text style={[styles.username, { color: colors.text }]}>
-              {user?.username} 👋
-            </Text>
+            <Text style={[styles.username, { color: colors.text }]}>{user?.username}</Text>
           </View>
-          <TouchableOpacity onPress={() => router.push('/story/add')}>
+          <TouchableOpacity
+            onPress={() => router.push('/story/add')}
+            activeOpacity={0.8}>
             <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
               <IconSymbol name="plus" size={22} color="#FFF" />
             </View>
@@ -116,117 +131,148 @@ export default function HomeScreen() {
         {/* Stats Cards */}
         {stats && (
           <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.statNumber, { color: colors.primary }]}>{stats.reading}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Reading</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.statNumber, { color: colors.success }]}>{stats.completed}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Completed</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.statNumber, { color: colors.accent }]}>
-                {stats.totalChaptersRead}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Chapters</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.statNumber, { color: '#3B82F6' }]}>{stats.planToRead}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Planned</Text>
-            </View>
+            {statCards.map((item) => (
+              <View
+                key={item.label}
+                style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                <View style={[styles.statIconBg, { backgroundColor: item.color + '15' }]}>
+                  <IconSymbol name={item.icon} size={16} color={item.color} />
+                </View>
+                <Text style={[styles.statNumber, { color: item.color }]}>{item.value}</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+              </View>
+            ))}
           </View>
         )}
+
+        {/* Quick Actions */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity
+            style={[styles.quickActionBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => router.push('/(tabs)/explore')}>
+            <IconSymbol name="globe" size={20} color={colors.primary} />
+            <Text style={[styles.quickActionText, { color: colors.text }]}>Browse MangaDex</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickActionBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => router.push('/(tabs)/social')}>
+            <IconSymbol name="person.2.fill" size={20} color={colors.primary} />
+            <Text style={[styles.quickActionText, { color: colors.text }]}>Friends</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Currently Reading */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>📚 Currently Reading</Text>
-            <TouchableOpacity onPress={() => router.push('/library')}>
+            <View style={styles.sectionTitleRow}>
+              <IconSymbol name="book.fill" size={18} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Currently Reading</Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/library')}>
               <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
             </TouchableOpacity>
           </View>
 
           {currentlyReading.length === 0 ? (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <IconSymbol name="books.vertical.fill" size={32} color={colors.textSecondary} />
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                No stories being read yet. Add your first story!
+                No stories being read yet.{'\n'}Add your first story!
               </Text>
               <TouchableOpacity
                 style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/story/add')}>
+                onPress={() => router.push('/story/add')}
+                activeOpacity={0.8}>
+                <IconSymbol name="plus" size={16} color="#FFF" />
                 <Text style={styles.emptyButtonText}>Add Story</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {currentlyReading.map((progress) => (
-                <TouchableOpacity
-                  key={progress._id}
-                  style={[styles.storyCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-                  onPress={() => router.push(`/story/${progress.story._id}` as any)}
-                  activeOpacity={0.7}>
-                  {progress.story.coverImage ? (
-                    <Image
-                      source={{ uri: progress.story.coverImage }}
-                      style={styles.storyCover}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <View style={[styles.storyCover, styles.placeholderCover, { backgroundColor: colors.surfaceElevated }]}>
-                      <Text style={{ fontSize: 32 }}>📖</Text>
-                    </View>
-                  )}
-                  <Text style={[styles.storyTitle, { color: colors.text }]} numberOfLines={2}>
-                    {progress.story.title}
-                  </Text>
-                  <View style={styles.progressInfo}>
-                    <Text style={[styles.chapterText, { color: colors.primary }]}>
-                      Ch. {progress.currentChapter}
-                      {progress.story.totalChapters ? ` / ${progress.story.totalChapters}` : ''}
-                    </Text>
-                  </View>
+              {currentlyReading.map((progress) => {
+                const pct = progress.story.totalChapters > 0
+                  ? Math.round((progress.currentChapter / progress.story.totalChapters) * 100)
+                  : 0;
+                return (
                   <TouchableOpacity
-                    style={[styles.incrementButton, { backgroundColor: colors.primary }]}
-                    onPress={async (e) => {
-                      e.stopPropagation();
-                      try {
-                        const updated = await api.incrementChapter(progress._id);
-                        setCurrentlyReading((prev) =>
-                          prev.map((p) => (p._id === progress._id ? updated : p))
-                        );
-                      } catch (err) {
-                        console.log(err);
-                      }
-                    }}>
-                    <Text style={styles.incrementText}>+1 Chapter</Text>
+                    key={progress._id}
+                    style={[styles.storyCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+                    onPress={() => router.push(`/story/${progress.story._id}` as any)}
+                    activeOpacity={0.7}>
+                    {progress.story.coverImage ? (
+                      <View>
+                        <Image source={{ uri: progress.story.coverImage }} style={styles.storyCover} contentFit="cover" />
+                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.coverOverlay} />
+                      </View>
+                    ) : (
+                      <View style={[styles.storyCover, styles.placeholderCover, { backgroundColor: colors.surfaceElevated }]}>
+                        <IconSymbol name="book.fill" size={32} color={colors.textSecondary} />
+                      </View>
+                    )}
+                    <View style={styles.storyMeta}>
+                      <Text style={[styles.storyTitle, { color: colors.text }]} numberOfLines={2}>
+                        {progress.story.title}
+                      </Text>
+                      <View style={styles.progressRow}>
+                        <Text style={[styles.chapterText, { color: colors.primary }]}>
+                          Ch. {progress.currentChapter}
+                          {progress.story.totalChapters ? ` / ${progress.story.totalChapters}` : ''}
+                        </Text>
+                      </View>
+                      {pct > 0 && (
+                        <View style={[styles.progressBar, { backgroundColor: colors.surfaceElevated }]}>
+                          <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: colors.primary }]} />
+                        </View>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.incrementButton, { backgroundColor: colors.primary }]}
+                      onPress={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const updated = await api.incrementChapter(progress._id);
+                          setCurrentlyReading((prev) => prev.map((p) => (p._id === progress._id ? updated : p)));
+                        } catch (err) { console.log(err); }
+                      }}
+                      activeOpacity={0.8}>
+                      <IconSymbol name="plus" size={14} color="#FFF" />
+                      <Text style={styles.incrementText}>Chapter</Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
+                );
+              })}
             </ScrollView>
           )}
         </View>
 
-        {/* Friends Activity */}
-        {activity.length > 0 && (
+        {/* Recently Updated */}
+        {recentlyUpdated.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>👥 Friends Activity</Text>
-            {activity.map((item, index) => (
-              <View
-                key={`${item._id}-${index}`}
-                style={[styles.activityItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                <View style={styles.activityContent}>
-                  <Text style={[styles.activityUser, { color: colors.primary }]}>
-                    {item.user?.username}
-                  </Text>
-                  <Text style={[styles.activityText, { color: colors.textSecondary }]}>
-                    is on chapter {item.currentChapter} of
-                  </Text>
-                  <Text style={[styles.activityStory, { color: colors.text }]}>
-                    {' '}
+            <View style={styles.sectionTitleRow}>
+              <IconSymbol name="clock.fill" size={18} color={colors.textSecondary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+            </View>
+            {recentlyUpdated.map((item) => (
+              <TouchableOpacity
+                key={item._id}
+                style={[styles.activityItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+                onPress={() => router.push(`/story/${item.story?._id}` as any)}>
+                <View style={[styles.statusIndicator, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
+                <View style={styles.activityInfo}>
+                  <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
                     {item.story?.title}
                   </Text>
+                  <View style={styles.activityMeta}>
+                    <View style={[styles.statusPill, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
+                      <Text style={[styles.statusPillText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
+                    </View>
+                    <Text style={[styles.activityChapter, { color: colors.textSecondary }]}>
+                      Ch. {item.currentChapter}{item.story?.totalChapters ? ` / ${item.story.totalChapters}` : ''}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+                <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -246,15 +292,15 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
   },
-  greeting: { fontSize: 14, marginBottom: 2 },
-  username: { fontSize: 24, fontWeight: '700' },
+  greeting: { fontSize: 14, marginBottom: 2, fontWeight: '500' },
+  username: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
   addButton: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
     borderRadius: BorderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.md,
+    ...Shadows.glow,
   },
   statsRow: {
     flexDirection: 'row',
@@ -264,25 +310,43 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    padding: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     borderWidth: 1,
+    gap: 3,
   },
-  statNumber: { fontSize: 22, fontWeight: '700' },
-  statLabel: { fontSize: 11, marginTop: 2, fontWeight: '500' },
-  section: {
-    marginTop: Spacing.lg,
+  statIconBg: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  statNumber: { fontSize: 20, fontWeight: '800' },
+  statLabel: { fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
+  quickActions: {
+    flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
   },
+  quickActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
+  quickActionText: { fontSize: 13, fontWeight: '600' },
+  section: { marginTop: Spacing.lg, paddingHorizontal: Spacing.lg },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.md,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700' },
-  seeAll: { fontSize: 14, fontWeight: '600' },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.md },
+  sectionTitle: { fontSize: 17, fontWeight: '700' },
+  seeAll: { fontSize: 13, fontWeight: '600' },
   storyCard: {
     width: 150,
     marginRight: Spacing.md,
@@ -290,77 +354,90 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
   },
-  storyCover: {
-    width: '100%',
-    height: 200,
-  },
-  placeholderCover: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storyTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    padding: Spacing.sm,
-    paddingBottom: 4,
-  },
-  progressInfo: {
-    paddingHorizontal: Spacing.sm,
-  },
-  chapterText: { fontSize: 12, fontWeight: '700' },
+  storyCover: { width: '100%', height: 190 },
+  coverOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 },
+  placeholderCover: { justifyContent: 'center', alignItems: 'center' },
+  storyMeta: { padding: Spacing.sm },
+  storyTitle: { fontSize: 12, fontWeight: '700', marginBottom: 4, lineHeight: 16 },
+  progressRow: { flexDirection: 'row', alignItems: 'center' },
+  chapterText: { fontSize: 11, fontWeight: '700' },
+  progressBar: { height: 3, borderRadius: 2, marginTop: 6, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2 },
   incrementButton: {
-    margin: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginHorizontal: Spacing.sm,
+    marginBottom: Spacing.sm,
     paddingVertical: 6,
     borderRadius: BorderRadius.sm,
-    alignItems: 'center',
   },
-  incrementText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
-  emptyCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  emptyText: { fontSize: 14, textAlign: 'center', marginBottom: Spacing.md },
-  emptyButton: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-  },
-  emptyButtonText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  incrementText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
   activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     marginBottom: Spacing.sm,
     borderWidth: 1,
+    gap: Spacing.md,
   },
-  activityContent: { flexDirection: 'row', flexWrap: 'wrap' },
-  activityUser: { fontWeight: '700', fontSize: 14 },
-  activityText: { fontSize: 14 },
-  activityStory: { fontWeight: '600', fontSize: 14 },
-  // Welcome screen
+  statusIndicator: { width: 4, height: 36, borderRadius: 2 },
+  activityInfo: { flex: 1 },
+  activityTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  activityMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.full },
+  statusPillText: { fontSize: 10, fontWeight: '700' },
+  activityChapter: { fontSize: 12, fontWeight: '600' },
+  emptyCard: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.sm,
+    ...Shadows.sm,
+  },
+  emptyButtonText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
   welcomeContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,
   },
-  logo: { fontSize: 72, marginBottom: Spacing.md },
-  appName: { fontSize: 36, fontWeight: '800', marginBottom: Spacing.sm },
-  tagline: { fontSize: 16, textAlign: 'center', marginBottom: Spacing.xl },
+  logoBg: {
+    width: 100,
+    height: 100,
+    borderRadius: BorderRadius.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  appName: { fontSize: 36, fontWeight: '800', letterSpacing: -1, marginBottom: Spacing.sm },
+  tagline: { fontSize: 16, textAlign: 'center', marginBottom: Spacing.xl, lineHeight: 24 },
   authButton: {
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: BorderRadius.md,
+    paddingVertical: 16,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     marginBottom: Spacing.md,
-    ...Shadows.md,
+    ...Shadows.glow,
   },
   authButtonText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
   authButtonOutline: {
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: BorderRadius.md,
+    paddingVertical: 16,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     borderWidth: 2,
   },
