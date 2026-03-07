@@ -128,7 +128,7 @@ export const Shadows = {
   },
 };
 
-export const StoryTypes = ['Manga', 'Webtoon', 'Manhwa', 'Manhua', 'Light Novel', 'Other'] as const;
+export const StoryTypes = ['Manga', 'Webtoon'] as const;
 
 export const ReadingStatuses = [
   'Reading',
