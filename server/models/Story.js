@@ -19,7 +19,7 @@ const storySchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ['Manga', 'Webtoon', 'Manhwa', 'Manhua', 'Light Novel', 'Other'],
+            enum: ['Manga', 'Webtoon'],
             default: 'Manga',
         },
         genres: [
@@ -60,6 +60,19 @@ const storySchema = new mongoose.Schema(
         totalReaders: {
             type: Number,
             default: 0,
+        },
+        views: {
+            type: Number,
+            default: 0,
+        },
+        mangadexId: { //in the futur we will compare using the title itself, for now and because it is esier :) we will do it using the mangadex id
+            type: String,
+            default: null,
+            index: true,
+        },
+        year: {
+            type: Number,
+            default: null,
         },
     },
     {

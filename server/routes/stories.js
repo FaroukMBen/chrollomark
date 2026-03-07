@@ -3,19 +3,24 @@ const Story = require('../models/Story');
 const ReadingProgress = require('../models/ReadingProgress');
 const Review = require('../models/Review');
 const auth = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
 // @route   POST /api/stories
 // @desc    Create a new story
-router.post('/', auth, async (req, res) => {
+router.post('/', [auth, upload.single('coverImage')], async (req, res) => {
     try {
-        const { title, coverImage, description, type, genres, author, status, totalChapters } =
-            req.body;
+        const { title, description, type, genres, author, status, totalChapters } = req.body;
+
+        let coverImageUrl = req.body.coverImage; // Allow string URL fallback
+        if (req.file) {
+            coverImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        }
 
         const story = new Story({
             title,
-            coverImage,
+            coverImage: coverImageUrl,
             description,
             type,
             genres,
@@ -108,17 +113,21 @@ router.get('/:id', auth, async (req, res) => {
 
 // @route   PUT /api/stories/:id
 // @desc    Update a story
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', [auth, upload.single('coverImage')], async (req, res) => {
     try {
         const story = await Story.findById(req.params.id);
         if (!story) return res.status(404).json({ message: 'Story not found' });
 
         // Only the creator or anyone can update (community-driven)
-        const { title, coverImage, description, type, genres, author, status, totalChapters } =
-            req.body;
+        const { title, description, type, genres, author, status, totalChapters } = req.body;
+
+        let coverImageUrl = req.body.coverImage;
+        if (req.file) {
+            coverImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        }
 
         if (title) story.title = title;
-        if (coverImage !== undefined) story.coverImage = coverImage;
+        if (coverImageUrl !== undefined) story.coverImage = coverImageUrl;
         if (description !== undefined) story.description = description;
         if (type) story.type = type;
         if (genres) story.genres = genres;
@@ -153,6 +162,69 @@ router.delete('/:id', auth, async (req, res) => {
 
         res.json({ message: 'Story deleted' });
     } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+// @route   POST /api/stories/clone-mangadex
+// @desc    Clone a manga from MangaDex into local DB (or update if exists)
+router.post('/clone-mangadex', auth, async (req, res) => {
+    try {
+        const { mangadexId, title, description, coverImage, author, status, totalChapters, genres, year } = req.body;
+
+        if (!mangadexId || !title) {
+            return res.status(400).json({ message: 'mangadexId and title are required' });
+        }
+
+        // Map MangaDex status to our status format
+        const statusMap = { ongoing: 'Ongoing', completed: 'Completed', hiatus: 'Hiatus', cancelled: 'Cancelled' };
+        const mappedStatus = statusMap[status] || 'Ongoing';
+
+        // Check if already exists
+        let story = await Story.findOne({ mangadexId });
+
+        if (story) {
+            // Update fields that may have changed
+            let updated = false;
+            if (totalChapters && totalChapters !== story.totalChapters) {
+                story.totalChapters = totalChapters;
+                updated = true;
+            }
+            if (mappedStatus !== story.status) {
+                story.status = mappedStatus;
+                updated = true;
+            }
+            if (coverImage && coverImage !== story.coverImage) {
+                story.coverImage = coverImage;
+                updated = true;
+            }
+            if (description && description !== story.description) {
+                story.description = description;
+                updated = true;
+            }
+            if (updated) await story.save();
+
+            return res.json({ story, created: false, updated });
+        }
+
+        // Create new
+        story = new Story({
+            title,
+            coverImage: coverImage || '',
+            description: description || '',
+            type: 'Manga',
+            genres: genres || [],
+            author: author || 'Unknown',
+            status: mappedStatus,
+            totalChapters: totalChapters ? Number.parseInt(totalChapters, 10) : null,
+            addedBy: req.user._id,
+            mangadexId,
+            year: year || null,
+        });
+
+        await story.save();
+        res.status(201).json({ story, created: true, updated: false });
+    } catch (error) {
+        console.error('Clone MangaDex error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });

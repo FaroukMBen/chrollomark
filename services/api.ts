@@ -1,11 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { offlineStore } from './offline';
 
 const getBaseUrl = () => {
     if (Platform.OS === 'web') {
         return 'http://localhost:5000';
     }
-    return 'http://10.113.230.82:5000';
+
+    const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
+    if (hostUri) {
+        const ip = hostUri.split(':')[0];
+        return `http://${ip}:5000`;
+    }
+
+    return 'http://10.17.244.82:5000';
 };
 
 const BASE_URL = getBaseUrl();
@@ -33,11 +42,12 @@ class ApiService {
         return this.token;
     }
 
-    private async getHeaders(): Promise<Record<string, string>> {
+    private async getHeaders(isFormData = false): Promise<Record<string, string>> {
         const token = await this.getToken();
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
+        const headers: Record<string, string> = {};
+        if (!isFormData) {
+            headers['Content-Type'] = 'application/json';
+        }
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
@@ -60,7 +70,8 @@ class ApiService {
             url += `?${queryString}`;
         }
 
-        const headers = await this.getHeaders();
+        const isFormData = body instanceof FormData;
+        const headers = await this.getHeaders(isFormData);
 
         const config: RequestInit = {
             method,
@@ -68,7 +79,7 @@ class ApiService {
         };
 
         if (body) {
-            config.body = JSON.stringify(body);
+            config.body = isFormData ? body : JSON.stringify(body);
         }
 
         try {
@@ -79,13 +90,60 @@ class ApiService {
                 throw new Error(data.message || 'Something went wrong');
             }
 
+            // Cache GET requests
+            if (method === 'GET') {
+                await offlineStore.setCache(url, data);
+            }
+
             return data as T;
         } catch (error: any) {
-            if (error.message === 'Network request failed') {
+            if (
+                error.message === 'Network request failed' ||
+                error.message.includes('Network')
+            ) {
+                if (method === 'GET') {
+                    const cached = await offlineStore.getCache(url);
+                    if (cached) return cached as T;
+                    throw new Error('Offline. No cached data available.');
+                } else if (method === 'POST' || method === 'PUT' || method === 'DELETE') {
+                    // Do not store auth mutations offline (login/register)
+                    if (!url.includes('/auth/') && !isFormData && body) {
+                        let description = 'Update data';
+                        if (url.includes('progress')) description = 'Update progress';
+                        if (url.includes('collections')) description = 'Update collection';
+
+                        await offlineStore.addMutation({
+                            endpoint: url.replace(this.baseUrl, ''),
+                            options: { method, body },
+                            description
+                        });
+                        throw new Error('You are offline. Change saved locally and will be synced later.');
+                    }
+                }
                 throw new Error('Unable to connect to server. Please check your connection.');
             }
             throw error;
         }
+    }
+
+    async syncMutations(): Promise<number> {
+        const mutations = await offlineStore.getPendingMutations();
+        if (mutations.length === 0) return 0;
+
+        let synced = 0;
+        for (const m of mutations) {
+            try {
+                await this.request(m.endpoint, m.options);
+                await offlineStore.removeMutation(m.id);
+                synced++;
+            } catch (err: any) {
+                if (!err.message?.includes('Network')) {
+                    // Remove if it's a server error like 400 since it won't ever succeed
+                    await offlineStore.removeMutation(m.id);
+                }
+            }
+        }
+        return synced;
     }
 
     // Auth
@@ -107,7 +165,7 @@ class ApiService {
         return this.request<any>('/auth/me');
     }
 
-    async updateProfile(data: { username?: string; bio?: string; avatar?: string; favoriteGenres?: string[] }) {
+    async updateProfile(data: any) {
         return this.request<any>('/auth/profile', { method: 'PUT', body: data });
     }
 
@@ -116,7 +174,7 @@ class ApiService {
         return this.request<any>('/stories', { method: 'POST', body: data });
     }
 
-    async getStories(params?: { page?: string; limit?: string; search?: string; type?: string; genre?: string }) {
+    async getStories(params?: { page?: string; limit?: string; search?: string; type?: string; genre?: string; sort?: string }) {
         return this.request<{ stories: any[]; totalPages: number; currentPage: number; total: number }>(
             '/stories',
             { params }
@@ -263,6 +321,68 @@ class ApiService {
 
     async getFriendsActivity() {
         return this.request<any[]>('/social/activity');
+    }
+
+    async getFeed() {
+        return this.request<{ feed: any[]; recommendations: any[] }>('/social/feed');
+    }
+
+    async getUserStats() {
+        return this.request<any>('/progress/stats');
+    }
+
+    // MangaDex API (on-demand via proxy)
+    async getMangaDexManga(params?: {
+        title?: string;
+        limit?: string;
+        offset?: string;
+        order?: string;
+        orderDir?: string;
+        status?: string;
+        contentRating?: string;
+        tags?: string;
+    }) {
+        return this.request<{ results: any[]; total: number; limit: number; offset: number }>('/mangadex/manga', { params });
+    }
+
+    async getMangaDexDetail(id: string) {
+        return this.request<{ manga: any }>(`/mangadex/manga/${id}`);
+    }
+
+    async getMangaDexTags() {
+        return this.request<{ tags: any[] }>('/mangadex/tags');
+    }
+
+    // Clone a MangaDex manga into local DB
+    async cloneMangaDex(manga: {
+        mangadexId: string;
+        title: string;
+        description?: string;
+        coverImage?: string;
+        author?: string;
+        status?: string;
+        totalChapters?: string;
+        genres?: string[];
+        year?: number;
+    }) {
+        return this.request<{ story: any; created: boolean; updated: boolean }>('/stories/clone-mangadex', {
+            method: 'POST',
+            body: manga,
+        });
+    }
+
+    // Collection story management
+    async addStoryToCollection(collectionId: string, storyId: string) {
+        return this.request<any>(`/collections/${collectionId}/stories`, {
+            method: 'PUT',
+            body: { storyId },
+        });
+    }
+
+    async removeStoryFromCollection(collectionId: string, storyId: string) {
+        return this.request<any>(`/collections/${collectionId}/stories/${storyId}`, {
+            method: 'DELETE',
+        });
     }
 }
 
