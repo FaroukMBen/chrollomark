@@ -1,0 +1,10 @@
+{
+    "version": "1.0.0",
+    "changelog": [
+        "Initial release with MangaDex integration",
+        "Library, Explore, Social, and Profile screens",
+        "Dark and Light mode support"
+    ],
+    "downloadUrl": "https://github.com/FaroukMBen/chrollomark/releases/latest",
+    "mandatory": false
+}
