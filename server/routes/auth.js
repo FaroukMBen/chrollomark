@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -95,10 +96,15 @@ router.get('/me', auth, async (req, res) => {
 
 // @route   PUT /api/auth/profile
 // @desc    Update user profile
-router.put('/profile', auth, async (req, res) => {
+router.put('/profile', [auth, upload.single('avatar')], async (req, res) => {
     try {
-        const { username, bio, avatar, favoriteGenres } = req.body;
+        const { username, bio, favoriteGenres } = req.body;
         const updates = {};
+
+        let avatarUrl = req.body.avatar;
+        if (req.file) {
+            avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        }
 
         if (username) {
             const existing = await User.findOne({ username, _id: { $ne: req.user._id } });
@@ -106,7 +112,7 @@ router.put('/profile', auth, async (req, res) => {
             updates.username = username;
         }
         if (bio !== undefined) updates.bio = bio;
-        if (avatar !== undefined) updates.avatar = avatar;
+        if (avatarUrl !== undefined) updates.avatar = avatarUrl;
         if (favoriteGenres) updates.favoriteGenres = favoriteGenres;
 
         const user = await User.findByIdAndUpdate(req.user._id, updates, {
