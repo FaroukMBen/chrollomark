@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { BorderRadius, Colors, ReadingStatuses, Spacing, StatusColors } from '@/constants/theme';
+import { BorderRadius, Colors, ReadingStatuses, Shadows, Spacing, StatusColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
 import { useAuth } from '@/store/AuthContext';
@@ -25,6 +25,7 @@ export default function LibraryScreen() {
   const router = useRouter();
 
   const [progress, setProgress] = useState<any[]>([]);
+  const [collections, setCollections] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>('All');
@@ -33,8 +34,12 @@ export default function LibraryScreen() {
     if (!isAuthenticated) return;
     try {
       const params = activeFilter !== 'All' ? { status: activeFilter } : undefined;
-      const data = await api.getMyProgress(params);
-      setProgress(data);
+      const [progressData, collectionsData] = await Promise.all([
+        api.getMyProgress(params),
+        api.getMyCollections(),
+      ]);
+      setProgress(progressData);
+      setCollections(collectionsData);
     } catch (error) {
       console.log('Error:', error);
     } finally {
@@ -42,9 +47,7 @@ export default function LibraryScreen() {
     }
   }, [isAuthenticated, activeFilter]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -56,7 +59,8 @@ export default function LibraryScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.center}>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          <IconSymbol name="book.fill" size={48} color={colors.textSecondary} />
+          <Text style={[styles.emptyText, { color: colors.textSecondary, marginTop: Spacing.md }]}>
             Sign in to view your library
           </Text>
         </View>
@@ -66,13 +70,33 @@ export default function LibraryScreen() {
 
   const filters = ['All', ...ReadingStatuses];
 
+  const getFilterIcon = (filter: string) => {
+    const icons: Record<string, string> = {
+      'All': 'books.vertical.fill',
+      'Reading': 'book.fill',
+      'Completed': 'checkmark.circle.fill',
+      'Plan to Read': 'bookmark.fill',
+      'On Hold': 'pause.circle.fill',
+      'Dropped': 'xmark.circle.fill',
+    };
+    return icons[filter] || 'book.fill';
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>My Library</Text>
-        <TouchableOpacity onPress={() => router.push('/story/add')}>
-          <IconSymbol name="plus.circle.fill" size={28} color={colors.primary} />
+        <View>
+          <Text style={[styles.title, { color: colors.text }]}>My Library</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            {progress.length} {progress.length === 1 ? 'title' : 'titles'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.addBtn, { backgroundColor: colors.primary }]}
+          onPress={() => router.push('/story/add')}
+          activeOpacity={0.8}>
+          <IconSymbol name="plus" size={18} color="#FFF" />
         </TouchableOpacity>
       </View>
 
@@ -82,30 +106,38 @@ export default function LibraryScreen() {
         showsHorizontalScrollIndicator={false}
         style={styles.filterContainer}
         contentContainerStyle={styles.filterContent}>
-        {filters.map((filter) => (
-          <TouchableOpacity
-            key={filter}
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor:
-                  activeFilter === filter ? colors.primary : colors.surface,
-                borderColor: activeFilter === filter ? colors.primary : colors.border,
-              },
-            ]}
-            onPress={() => {
-              setActiveFilter(filter);
-              setIsLoading(true);
-            }}>
-            <Text
+        {filters.map((filter) => {
+          const isActive = activeFilter === filter;
+          const chipColor = filter === 'All' ? colors.primary : (StatusColors[filter] || colors.primary);
+          return (
+            <TouchableOpacity
+              key={filter}
               style={[
-                styles.filterText,
-                { color: activeFilter === filter ? '#FFF' : colors.textSecondary },
-              ]}>
-              {filter}
-            </Text>
-          </TouchableOpacity>
-        ))}
+                styles.filterChip,
+                {
+                  backgroundColor: isActive ? chipColor + '20' : colors.surface,
+                  borderColor: isActive ? chipColor : colors.border,
+                },
+              ]}
+              onPress={() => {
+                setActiveFilter(filter);
+                setIsLoading(true);
+              }}>
+              <IconSymbol
+                name={getFilterIcon(filter) as any}
+                size={13}
+                color={isActive ? chipColor : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.filterText,
+                  { color: isActive ? chipColor : colors.textSecondary },
+                ]}>
+                {filter}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {isLoading ? (
@@ -115,14 +147,59 @@ export default function LibraryScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           contentContainerStyle={styles.listContent}>
+
+          {/* Collections section */}
+          {activeFilter === 'All' && collections.length > 0 && (
+            <View style={styles.collectionsSection}>
+              <View style={styles.collectionHeader}>
+                <View style={styles.collectionTitleRow}>
+                  <IconSymbol name="folder.fill" size={16} color={colors.primary} />
+                  <Text style={[styles.collectionTitle, { color: colors.text }]}>Collections</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.newCollBtn, { backgroundColor: colors.primary + '15' }]}
+                  onPress={() => router.push('/collection/create')}>
+                  <IconSymbol name="plus" size={12} color={colors.primary} />
+                  <Text style={[styles.newCollText, { color: colors.primary }]}>New</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {collections.map((coll) => (
+                  <TouchableOpacity
+                    key={coll._id}
+                    style={[styles.collCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+                    onPress={() => router.push(`/collection/${coll._id}` as any)}>
+                    <View style={[styles.collStripe, { backgroundColor: coll.color || colors.primary }]} />
+                    <Text style={[styles.collName, { color: colors.text }]} numberOfLines={1}>{coll.name}</Text>
+                    <Text style={[styles.collCount, { color: colors.textSecondary }]}>{coll.stories?.length || 0} stories</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {progress.length === 0 ? (
-            <View style={styles.center}>
-              <Text style={{ fontSize: 48, marginBottom: Spacing.md }}>📚</Text>
+            <View style={styles.emptyCenter}>
+              <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
+                <IconSymbol name="books.vertical.fill" size={40} color={colors.textSecondary} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                {activeFilter === 'All' ? 'Library is empty' : `No "${activeFilter}" titles`}
+              </Text>
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                 {activeFilter === 'All'
-                  ? 'Your library is empty. Start by adding a story!'
-                  : `No stories with status "${activeFilter}"`}
+                  ? 'Start by exploring and adding stories to your library'
+                  : `You don't have any stories with "${activeFilter}" status`}
               </Text>
+              {activeFilter === 'All' && (
+                <TouchableOpacity
+                  style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push('/(tabs)/explore')}
+                  activeOpacity={0.8}>
+                  <IconSymbol name="globe" size={16} color="#FFF" />
+                  <Text style={styles.emptyBtnText}>Browse MangaDex</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             progress.map((item) => (
@@ -135,7 +212,7 @@ export default function LibraryScreen() {
                   <Image source={{ uri: item.story.coverImage }} style={styles.listCover} contentFit="cover" />
                 ) : (
                   <View style={[styles.listCover, styles.placeholderCover, { backgroundColor: colors.surfaceElevated }]}>
-                    <Text style={{ fontSize: 24 }}>📖</Text>
+                    <IconSymbol name="book.fill" size={24} color={colors.textSecondary} />
                   </View>
                 )}
                 <View style={styles.listInfo}>
@@ -151,6 +228,7 @@ export default function LibraryScreen() {
                         styles.statusBadge,
                         { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' },
                       ]}>
+                      <View style={[styles.statusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
                       <Text
                         style={[
                           styles.statusText,
@@ -164,6 +242,20 @@ export default function LibraryScreen() {
                       {item.story.totalChapters ? ` / ${item.story.totalChapters}` : ''}
                     </Text>
                   </View>
+                  {/* Progress bar */}
+                  {item.story.totalChapters > 0 && (
+                    <View style={[styles.progressBar, { backgroundColor: colors.surfaceElevated }]}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          {
+                            backgroundColor: StatusColors[item.status] || colors.primary,
+                            width: `${Math.min((item.currentChapter / item.story.totalChapters) * 100, 100)}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={[styles.quickAction, { backgroundColor: colors.primary }]}
@@ -175,8 +267,9 @@ export default function LibraryScreen() {
                     } catch (err) {
                       console.log(err);
                     }
-                  }}>
-                  <Text style={styles.quickActionText}>+1</Text>
+                  }}
+                  activeOpacity={0.7}>
+                  <IconSymbol name="plus" size={16} color="#FFF" />
                 </TouchableOpacity>
               </TouchableOpacity>
             ))
@@ -196,44 +289,131 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
-  title: { fontSize: 28, fontWeight: '800' },
-  filterContainer: { maxHeight: 50, marginBottom: Spacing.sm },
-  filterContent: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-  },
-  filterText: { fontSize: 13, fontWeight: '600' },
-  listContent: { paddingHorizontal: Spacing.lg, paddingBottom: 100 },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
-    borderWidth: 1,
-  },
-  listCover: { width: 60, height: 85, borderRadius: BorderRadius.sm },
-  placeholderCover: { justifyContent: 'center', alignItems: 'center' },
-  listInfo: { flex: 1, marginLeft: Spacing.md },
-  listTitle: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
-  listAuthor: { fontSize: 12, marginBottom: 6 },
-  listMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.full },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  chapterInfo: { fontSize: 12, fontWeight: '700' },
-  quickAction: {
+  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, fontWeight: '500', marginTop: 2 },
+  addBtn: {
     width: 40,
     height: 40,
     borderRadius: BorderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: Spacing.sm,
+    ...Shadows.sm,
   },
-  quickActionText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
-  emptyText: { fontSize: 15, textAlign: 'center' },
+  filterContainer: { maxHeight: 50, marginBottom: Spacing.sm, marginTop: Spacing.sm },
+  filterContent: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  filterText: { fontSize: 13, fontWeight: '600' },
+
+  // Collections
+  collectionsSection: { marginBottom: Spacing.md },
+  collectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  collectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  collectionTitle: { fontSize: 15, fontWeight: '700' },
+  newCollBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+  },
+  newCollText: { fontSize: 11, fontWeight: '700' },
+  collCard: {
+    width: 130,
+    padding: Spacing.md,
+    marginRight: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
+  collStripe: { width: 24, height: 3, borderRadius: 2, marginBottom: 8 },
+  collName: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  collCount: { fontSize: 11, fontWeight: '500' },
+
+  // List
+  listContent: { paddingHorizontal: Spacing.lg, paddingBottom: 100 },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+  },
+  listCover: { width: 65, height: 90, borderRadius: BorderRadius.md },
+  placeholderCover: { justifyContent: 'center', alignItems: 'center' },
+  listInfo: { flex: 1, marginLeft: Spacing.md },
+  listTitle: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
+  listAuthor: { fontSize: 12, marginBottom: 6, fontWeight: '500' },
+  listMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+  },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 11, fontWeight: '700' },
+  chapterInfo: { fontSize: 12, fontWeight: '700' },
+  progressBar: {
+    height: 3,
+    borderRadius: 2,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  quickAction: {
+    width: 38,
+    height: 38,
+    borderRadius: BorderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: Spacing.sm,
+    ...Shadows.sm,
+  },
+  emptyCenter: {
+    paddingTop: 60,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyIconBg: {
+    width: 80,
+    height: 80,
+    borderRadius: BorderRadius.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.lg,
+    ...Shadows.sm,
+  },
+  emptyBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
 });

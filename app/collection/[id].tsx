@@ -91,10 +91,29 @@ export default function CollectionDetailScreen() {
         {/* Stories */}
         {collection.stories?.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={{ fontSize: 48 }}>📚</Text>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              No stories in this collection yet
+            <View style={[styles.emptyIcon, { backgroundColor: colors.surfaceElevated }]}>
+              <IconSymbol name="books.vertical.fill" size={40} color={colors.textSecondary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              Collection is empty
             </Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Add stories from the Explore page or from a story's detail page using the "Collection" button.
+            </Text>
+            <View style={styles.emptyActions}>
+              <TouchableOpacity
+                style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/(tabs)/explore')}>
+                <IconSymbol name="globe" size={16} color="#FFF" />
+                <Text style={styles.emptyBtnText}>Browse MangaDex</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.emptyBtnOutline, { borderColor: colors.primary }]}
+                onPress={() => router.push('/(tabs)/library')}>
+                <IconSymbol name="books.vertical.fill" size={16} color={colors.primary} />
+                <Text style={[styles.emptyBtnOutlineText, { color: colors.primary }]}>My Library</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
           collection.stories?.map((story: any) => (
@@ -106,7 +125,7 @@ export default function CollectionDetailScreen() {
                 <Image source={{ uri: story.coverImage }} style={styles.storyCover} contentFit="cover" />
               ) : (
                 <View style={[styles.storyCover, styles.placeholder, { backgroundColor: colors.surfaceElevated }]}>
-                  <Text style={{ fontSize: 20 }}>📖</Text>
+                  <IconSymbol name="book.fill" size={24} color={colors.textSecondary} />
                 </View>
               )}
               <View style={styles.storyInfo}>
@@ -165,6 +184,35 @@ const styles = StyleSheet.create({
   storyInfo: { flex: 1, marginLeft: Spacing.md },
   storyTitle: { fontSize: 15, fontWeight: '700' },
   storyType: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  empty: { alignItems: 'center', paddingTop: 60 },
-  emptyText: { fontSize: 14, marginTop: Spacing.md },
+  empty: { alignItems: 'center', paddingTop: 50, paddingHorizontal: Spacing.xl },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: BorderRadius.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  emptyText: { fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: Spacing.lg },
+  emptyActions: { flexDirection: 'row', gap: Spacing.sm },
+  emptyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
+  },
+  emptyBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  emptyBtnOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+  },
+  emptyBtnOutlineText: { fontSize: 13, fontWeight: '700' },
 });
