@@ -2,6 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const FriendRequest = require('../models/FriendRequest');
 const ReadingProgress = require('../models/ReadingProgress');
+const Review = require('../models/Review');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -216,7 +217,7 @@ router.get('/user/:id', auth, async (req, res) => {
 });
 
 // @route   GET /api/social/activity
-// @desc    Get friends' recent activity
+// @desc    Get friends' recent activity (reading updates)
 router.get('/activity', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
@@ -238,6 +239,108 @@ router.get('/activity', auth, async (req, res) => {
 
         res.json(recentActivity);
     } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   GET /api/social/feed
+// @desc    Get rich activity feed (reviews, progress, recommendations) — Steam-style
+router.get('/feed', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        const friendIds = user.friends;
+
+        if (friendIds.length === 0) {
+            return res.json({ feed: [], recommendations: [] });
+        }
+
+        // 1) Friend reviews (last 30 days)
+        const recentReviews = await Review.find({
+            user: { $in: friendIds },
+            createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        })
+            .sort('-createdAt')
+            .limit(20)
+            .populate('user', 'username avatar')
+            .populate('story', 'title coverImage type author');
+
+        // 2) Friend progress updates (last 7 days)
+        const recentProgress = await ReadingProgress.find({
+            user: { $in: friendIds },
+            lastReadDate: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        })
+            .sort('-lastReadDate')
+            .limit(30)
+            .populate('user', 'username avatar')
+            .populate('story', 'title coverImage type');
+
+        // Build unified feed sorted by date
+        const feed = [];
+
+        for (const review of recentReviews) {
+            feed.push({
+                type: 'review',
+                id: `review-${review._id}`,
+                user: review.user,
+                story: review.story,
+                rating: review.rating,
+                text: review.text,
+                title: review.title,
+                likes: review.likes?.length || 0,
+                timestamp: review.createdAt,
+            });
+        }
+
+        for (const progress of recentProgress) {
+            feed.push({
+                type: 'progress',
+                id: `progress-${progress._id}`,
+                user: progress.user,
+                story: progress.story,
+                status: progress.status,
+                currentChapter: progress.currentChapter,
+                timestamp: progress.lastReadDate || progress.updatedAt,
+            });
+        }
+
+        // Sort by timestamp descending
+        feed.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        // 3) Recommendations: stories that multiple friends have read and rated highly
+        const friendProgress = await ReadingProgress.find({
+            user: { $in: friendIds },
+            status: { $in: ['Reading', 'Completed'] },
+        }).populate('story', 'title coverImage type author averageRating totalReaders');
+
+        // Group by story, count how many friends read it
+        const storyMap = {};
+        for (const p of friendProgress) {
+            if (!p.story) continue;
+            const sid = p.story._id.toString();
+            if (!storyMap[sid]) {
+                storyMap[sid] = { story: p.story, friendsReading: [], avgRating: 0 };
+            }
+            storyMap[sid].friendsReading.push(p.user);
+        }
+
+        // Check which of these the user already has in library
+        const userProgress = await ReadingProgress.find({ user: req.user._id }).select('story');
+        const userStoryIds = new Set(userProgress.map(p => p.story.toString()));
+
+        const recommendations = Object.values(storyMap)
+            .filter(item => !userStoryIds.has(item.story._id.toString())) // exclude stories user already reads
+            .filter(item => item.friendsReading.length >= 1) // at least 1 friend reads it
+            .sort((a, b) => b.friendsReading.length - a.friendsReading.length)
+            .slice(0, 10)
+            .map(item => ({
+                story: item.story,
+                friendsReading: item.friendsReading.slice(0, 3), // show first 3 friends
+                friendCount: item.friendsReading.length,
+            }));
+
+        res.json({ feed: feed.slice(0, 50), recommendations });
+    } catch (error) {
+        console.error('Feed error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });

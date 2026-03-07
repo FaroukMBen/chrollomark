@@ -166,7 +166,7 @@ export default function UserProfileScreen() {
                     <Image source={{ uri: item.story.coverImage }} style={styles.progressCover} contentFit="cover" />
                   ) : (
                     <View style={[styles.progressCover, styles.placeholderCover, { backgroundColor: colors.surfaceElevated }]}>
-                      <Text>📖</Text>
+                      <IconSymbol name="book.fill" size={24} color={colors.textSecondary} />
                     </View>
                   )}
                   <View style={styles.progressInfo}>
