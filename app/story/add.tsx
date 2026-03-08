@@ -3,15 +3,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,6 +36,9 @@ export default function AddStoryScreen() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [currentChapter, setCurrentChapter] = useState('');
   const [status, setStatus] = useState('Plan to Read');
+  const [year, setYear] = useState('');
+  const [storyStatus, setStoryStatus] = useState('Ongoing');
+  const [contentRating, setContentRating] = useState('safe');
   const [isLoading, setIsLoading] = useState(false);
 
   const toggleGenre = (genre: string) => {
@@ -71,7 +74,7 @@ export default function AddStoryScreen() {
       );
       if (duplicate) {
         setIsLoading(false);
-        showToast({ message: `"${duplicate.title}" already exists in the global library. Find it in Explore!`, type: 'error' });
+        showToast({ message: `"${duplicate.title}" already exists on Chrollomark. Find it in Explore!`, type: 'error' });
         return;
       }
 
@@ -81,6 +84,9 @@ export default function AddStoryScreen() {
       formData.append('type', type);
       selectedGenres.forEach(g => formData.append('genres', g));
       formData.append('author', author.trim());
+      formData.append('status', storyStatus);
+      formData.append('contentRating', contentRating);
+      if (year) formData.append('year', year);
       if (totalChapters) formData.append('totalChapters', totalChapters);
       
       if (coverImage) {
@@ -265,6 +271,63 @@ export default function AddStoryScreen() {
             </View>
           </View>
 
+          {/* Story Status */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>STORY STATUS</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.chipRow}>
+                {['Ongoing', 'Completed', 'Hiatus', 'Cancelled'].map((s) => {
+                  const isActive = storyStatus === s;
+                  return (
+                    <TouchableOpacity
+                      key={s}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: isActive ? colors.primary + '20' : colors.surface,
+                          borderColor: isActive ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => setStoryStatus(s)}>
+                      <Text style={[styles.chipText, { color: isActive ? colors.primary : colors.textSecondary }]}>
+                        {s}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* Content Rating */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>CONTENT RATING</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.chipRow}>
+                {['safe', 'suggestive', 'erotica', 'pornographic'].map((s) => {
+                  const isActive = contentRating === s;
+                  const label = s.charAt(0).toUpperCase() + s.slice(1);
+                  return (
+                    <TouchableOpacity
+                      key={s}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: isActive ? colors.primary + '20' : colors.surface,
+                          borderColor: isActive ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => setContentRating(s)}>
+                      <Text style={[styles.chipText, { color: isActive ? colors.primary : colors.textSecondary }]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
           {/* Chapter Info */}
           <View style={styles.rowFields}>
             <View style={[styles.field, { flex: 1 }]}>
@@ -281,15 +344,16 @@ export default function AddStoryScreen() {
               </View>
             </View>
             <View style={[styles.field, { flex: 1 }]}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>TOTAL CHAPTERS</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>RELEASE YEAR</Text>
               <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <TextInput
                   style={[styles.input, { color: colors.text }]}
-                  placeholder="Ongoing"
+                  placeholder="e.g. 2024"
                   placeholderTextColor={colors.textSecondary + '80'}
-                  value={totalChapters}
-                  onChangeText={setTotalChapters}
+                  value={year}
+                  onChangeText={setYear}
                   keyboardType="numeric"
+                  maxLength={4}
                 />
               </View>
             </View>

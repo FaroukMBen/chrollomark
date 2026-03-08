@@ -74,6 +74,23 @@ const storySchema = new mongoose.Schema(
             type: Number,
             default: null,
         },
+        contentRating: {
+            type: String,
+            enum: ['safe', 'suggestive', 'erotica', 'pornographic'],
+            default: 'safe',
+        },
+        likes: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            }
+        ],
+        dislikes: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            }
+        ],
     },
     {
         timestamps: true,

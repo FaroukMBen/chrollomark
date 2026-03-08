@@ -159,6 +159,33 @@ router.delete('/:id', auth, async (req, res) => {
     }
 });
 
+// @route   POST /api/collections/:id/clone
+// @desc    Clone another user's public collection
+router.post('/:id/clone', auth, async (req, res) => {
+    try {
+        const sourceCollection = await Collection.findById(req.params.id);
+        if (!sourceCollection) return res.status(404).json({ message: 'Collection not found' });
+
+        if (!sourceCollection.isPublic && sourceCollection.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'This collection is private' });
+        }
+
+        const newCollection = new Collection({
+            user: req.user._id,
+            name: `${sourceCollection.name} (Clone)`,
+            description: sourceCollection.description,
+            color: sourceCollection.color,
+            isPublic: false,
+            stories: sourceCollection.stories,
+        });
+
+        await newCollection.save();
+        res.status(201).json(newCollection);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // @route   GET /api/collections/user/:userId
 // @desc    Get another user's public collections
 router.get('/user/:userId', auth, async (req, res) => {
