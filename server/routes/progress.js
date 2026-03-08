@@ -70,6 +70,7 @@ router.get('/', auth, async (req, res) => {
         const query = { user: req.user._id };
 
         if (status) query.status = status;
+        if (req.query.favorite === 'true') query.isFavorite = true;
 
         const progress = await ReadingProgress.find(query)
             .sort(sort)
@@ -182,6 +183,39 @@ router.get('/user/:userId', auth, async (req, res) => {
             .populate('story', 'title coverImage type totalChapters author');
 
         res.json(progress);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   PUT /api/progress/:storyId/favorite
+// @desc    Toggle favorite status
+router.put('/:storyId/favorite', auth, async (req, res) => {
+    try {
+        let progress = await ReadingProgress.findOne({
+            story: req.params.storyId,
+            user: req.user._id,
+        });
+
+        if (!progress) {
+            // Check if story exists to avoid creating progress for non-existent story
+            const story = await Story.findById(req.params.storyId);
+            if (!story) return res.status(404).json({ message: 'Story not found' });
+
+            // Create basic progress if not in library but Favorited
+            progress = new ReadingProgress({
+                user: req.user._id,
+                story: req.params.storyId,
+                status: 'Plan to Read',
+                isFavorite: true,
+            });
+            await Story.findByIdAndUpdate(req.params.storyId, { $inc: { totalReaders: 1 } });
+        } else {
+            progress.isFavorite = !progress.isFavorite;
+        }
+
+        await progress.save();
+        res.json({ isFavorite: progress.isFavorite });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }

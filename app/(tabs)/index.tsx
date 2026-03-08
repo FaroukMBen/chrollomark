@@ -119,13 +119,6 @@ export default function HomeScreen() {
             <Text style={[styles.greeting, { color: colors.textSecondary }]}>Welcome back,</Text>
             <Text style={[styles.username, { color: colors.text }]}>{user?.username}</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => router.push('/story/add')}
-            activeOpacity={0.8}>
-            <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
-              <IconSymbol name="plus" size={22} color="#FFF" />
-            </View>
-          </TouchableOpacity>
         </View>
 
         {/* Stats Cards */}
@@ -177,15 +170,8 @@ export default function HomeScreen() {
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <IconSymbol name="books.vertical.fill" size={32} color={colors.textSecondary} />
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                No stories being read yet.{'\n'}Add your first story!
+                No stories being read yet.{'\n'}Find your first story in Explore!
               </Text>
-              <TouchableOpacity
-                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/story/add')}
-                activeOpacity={0.8}>
-                <IconSymbol name="plus" size={16} color="#FFF" />
-                <Text style={styles.emptyButtonText}>Add Story</Text>
-              </TouchableOpacity>
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
