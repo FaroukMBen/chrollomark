@@ -42,6 +42,7 @@ const STATUS_OPTIONS = [
 const CONTENT_RATINGS = [
   { label: 'Safe', value: 'safe' },
   { label: 'Suggestive', value: 'suggestive' },
+  { label: 'Pornographic', value: 'pornographic' },
 ];
 
 const statusColor = (status: string) => {
@@ -64,13 +65,13 @@ export default function ExploreScreen() {
   // Shared state
   const [search, setSearch] = useState('');
   const searchRef = useRef('');
-  const [source, setSource] = useState<SourceTab>('mangadex');
+  const [source, setSource] = useState<SourceTab>('local');
   const [refreshing, setRefreshing] = useState(false);
 
   // Library of stories the user has in their reading progress
   const [userLibraryIds, setUserLibraryIds] = useState<Set<string>>(new Set());
 
-  // Local stories state (Global Library)
+  // Local stories state (Chrollomark)
   const [localResults, setLocalResults] = useState<any[]>([]);
   const [localLoading, setLocalLoading] = useState(false);
   const [localTotal, setLocalTotal] = useState(0);
@@ -87,6 +88,21 @@ export default function ExploreScreen() {
   const [order, setOrder] = useState('followedCount');
   const [statusFilter, setStatusFilter] = useState('');
   const [contentRating, setContentRating] = useState('safe,suggestive');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const activeFilterCount = React.useMemo(() => {
+    let count = 0;
+    if (order !== 'followedCount') count++;
+    if (statusFilter !== '') count++;
+    if (contentRating !== 'safe,suggestive') count++;
+    return count;
+  }, [order, statusFilter, contentRating]);
+
+  const resetFilters = () => {
+    setOrder('followedCount');
+    setStatusFilter('');
+    setContentRating('safe,suggestive');
+  };
 
   const handleSearchChange = useCallback((text: string) => {
     setSearch(text);
@@ -106,7 +122,7 @@ export default function ExploreScreen() {
     } catch { /* ignore */ }
   }, []);
 
-  // --- Local stories (Global Library) ---
+  // --- Local stories (Chrollomark) ---
   const loadLocal = useCallback(async (pageNum = 1, append = false) => {
     setLocalLoading(true);
     try {
@@ -139,7 +155,7 @@ export default function ExploreScreen() {
         offset: String(offset),
         order: order,
         orderDir: order === 'title' ? 'asc' : 'desc',
-        contentRating,
+        contentRating: contentRating,
       };
       if (searchRef.current.trim()) params.title = searchRef.current.trim();
       if (statusFilter) params.status = statusFilter;
@@ -280,7 +296,7 @@ export default function ExploreScreen() {
             )}
             {!isMD && (
               <View style={[styles.apiBadge, { backgroundColor: colors.primary }]}>
-                <Text style={styles.apiBadgeText}>LIBRARY</Text>
+                <Text style={styles.apiBadgeText}>CHROLLOMARK</Text>
               </View>
             )}
           </View>
@@ -363,20 +379,23 @@ export default function ExploreScreen() {
         {/* Source Toggle */}
         <View style={styles.sourceRow}>
           {([
+            { key: 'local' as SourceTab, label: 'Chrollomark', icon: 'books.vertical.fill' as const },
             { key: 'mangadex' as SourceTab, label: 'MangaDex', icon: 'globe' as const },
-            { key: 'local' as SourceTab, label: 'Global Library', icon: 'books.vertical.fill' as const },
           ]).map(({ key, label, icon }) => {
             const isActive = source === key;
             return (
               <TouchableOpacity
                 key={key}
-                style={[styles.sourceTab, {
-                  backgroundColor: isActive ? (key === 'mangadex' ? '#FF6740' : colors.primary) : colors.surface,
-                  borderColor: isActive ? (key === 'mangadex' ? '#FF6740' : colors.primary) : colors.border,
-                }]}
+                style={[styles.sourceTab, isActive && { backgroundColor: colors.surface }]}
                 onPress={() => setSource(key)}>
-                <IconSymbol name={icon} size={14} color={isActive ? '#FFF' : colors.textSecondary} />
-                <Text style={[styles.sourceTabText, { color: isActive ? '#FFF' : colors.textSecondary }]}>{label}</Text>
+                <IconSymbol 
+                  name={icon} 
+                  size={14} 
+                  color={isActive ? (key === 'mangadex' ? '#FF6740' : colors.primary) : colors.textSecondary} 
+                />
+                <Text style={[styles.sourceTabText, { color: isActive ? colors.text : colors.textSecondary }]}>
+                  {label}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -388,7 +407,7 @@ export default function ExploreScreen() {
             <IconSymbol name="magnifyingglass" size={17} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder={source === 'mangadex' ? 'Search MangaDex...' : 'Search global library...'}
+              placeholder={source === 'mangadex' ? 'Search MangaDex...' : 'Search Chrollomark...'}
               placeholderTextColor={colors.textSecondary}
               value={search}
               onChangeText={handleSearchChange}
@@ -401,42 +420,67 @@ export default function ExploreScreen() {
               </TouchableOpacity>
             )}
           </View>
+          <TouchableOpacity 
+            style={[styles.filterToggleBtn, { backgroundColor: showFilters ? colors.primary : colors.surface, borderColor: colors.border }]}
+            onPress={() => setShowFilters(!showFilters)}>
+            <IconSymbol name="line.3.horizontal.decrease" size={18} color={showFilters ? "#FFF" : colors.textSecondary} />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterDotBadge}>
+                <Text style={styles.filterDotText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Filter pills */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent} style={styles.filterRow}>
-          {ORDER_OPTIONS.map(opt => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.filterChip, {
-                backgroundColor: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) + '20' : colors.surface,
-                borderColor: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.border,
-              }]}
-              onPress={() => setOrder(opt.value)}>
-              <IconSymbol name={opt.icon} size={12} color={order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.textSecondary} />
-              <Text style={[styles.filterText, { color: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.textSecondary }]}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Collapsible Filter Container */}
+        {showFilters && (
+          <View style={[styles.collapsibleFilters, { backgroundColor: colors.surfaceElevated, borderBottomColor: colors.border }]}>
+            <View style={styles.filterHeaderRow}>
+               <View style={styles.filterTitleGroup}>
+                 <IconSymbol name="line.3.horizontal.decrease" size={14} color={colors.textSecondary} />
+                 <Text style={[styles.filterHeaderTitle, { color: colors.text }]}>Active Filters</Text>
+               </View>
+               <TouchableOpacity 
+                 style={[styles.resetBtn, { backgroundColor: colors.primary + '15' }]} 
+                 onPress={resetFilters}
+                 activeOpacity={0.7}>
+                 <IconSymbol name="arrow.counterclockwise" size={12} color={colors.primary} />
+                 <Text style={[styles.resetText, { color: colors.primary }]}>Reset All</Text>
+               </TouchableOpacity>
+            </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent} style={styles.filterRow2}>
-          {STATUS_OPTIONS.map(opt => {
-            const isActive = statusFilter === opt.value;
-            const chipColor = opt.value ? statusColor(opt.value) : colors.primary;
-            return (
-              <TouchableOpacity
-                key={opt.value}
-                style={[styles.filterChip, {
-                  backgroundColor: isActive ? chipColor + '20' : colors.surface,
-                  borderColor: isActive ? chipColor : colors.border,
-                }]}
-                onPress={() => setStatusFilter(opt.value)}>
-                <Text style={[styles.filterText, { color: isActive ? chipColor : colors.textSecondary }]}>{opt.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-          {source === 'mangadex' && (
-            <>
+            {/* Filter pills */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent} style={styles.filterRow}>
+              {ORDER_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.filterChip, {
+                    backgroundColor: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) + '20' : colors.surface,
+                    borderColor: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.border,
+                  }]}
+                  onPress={() => setOrder(opt.value)}>
+                  <IconSymbol name={opt.icon} size={12} color={order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.textSecondary} />
+                  <Text style={[styles.filterText, { color: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.textSecondary }]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent} style={styles.filterRow2}>
+              {STATUS_OPTIONS.map(opt => {
+                const isActive = statusFilter === opt.value;
+                const chipColor = opt.value ? statusColor(opt.value) : colors.primary;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[styles.filterChip, {
+                      backgroundColor: isActive ? chipColor + '20' : colors.surface,
+                      borderColor: isActive ? chipColor : colors.border,
+                    }]}
+                    onPress={() => setStatusFilter(opt.value)}>
+                    <Text style={[styles.filterText, { color: isActive ? chipColor : colors.textSecondary }]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
               {CONTENT_RATINGS.map(opt => {
                 const active = contentRating.includes(opt.value);
@@ -455,9 +499,9 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </>
-          )}
-        </ScrollView>
+            </ScrollView>
+          </View>
+        )}
 
         <View style={styles.resultsHeader}>
           <Text style={[styles.resultsCount, { color: colors.textSecondary }]}>{totalCount.toLocaleString()} {totalCount === 1 ? 'result' : 'results'}</Text>
@@ -519,7 +563,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.xs,
-    gap: Spacing.sm,
+    padding: 4,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
   },
   sourceTab: {
     flex: 1,
@@ -528,23 +574,87 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 9,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
+    borderRadius: BorderRadius.md,
   },
   sourceTabText: { fontSize: 13, fontWeight: '700' },
-  searchContainer: { paddingHorizontal: Spacing.lg, marginTop: Spacing.sm },
+  filterToggleBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Shadows.sm,
+  },
+  filterDotBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EF4444',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+    zIndex: 1,
+  },
+  filterDotText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  collapsibleFilters: {
+    marginTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    paddingTop: Spacing.xs,
+  },
+  filterHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  filterTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+  },
+  resetText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterRow: { marginTop: Spacing.xs, maxHeight: 42 },
+  filterRow2: { marginTop: Spacing.xs, maxHeight: 42 },
+  searchContainer: { paddingHorizontal: Spacing.lg, marginTop: Spacing.sm, flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
   searchBar: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
+    height: 48,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     gap: Spacing.sm,
   },
   searchInput: { flex: 1, fontSize: 14 },
-  filterRow: { marginTop: Spacing.sm, maxHeight: 42 },
-  filterRow2: { marginTop: Spacing.xs, maxHeight: 42 },
   filterContent: { paddingHorizontal: Spacing.lg, gap: 6 },
   filterChip: {
     flexDirection: 'row',
