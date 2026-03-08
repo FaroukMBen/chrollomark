@@ -4,17 +4,23 @@ import { Platform } from 'react-native';
 import { offlineStore } from './offline';
 
 const getBaseUrl = () => {
+    if (process.env.EXPO_PUBLIC_API_URL) {
+        return process.env.EXPO_PUBLIC_API_URL;
+    }
+
     if (Platform.OS === 'web') {
         return 'http://localhost:5000';
     }
 
-    const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
-    if (hostUri) {
-        const ip = hostUri.split(':')[0];
-        return `http://${ip}:5000`;
+    if (__DEV__) {
+        const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost;
+        if (hostUri) {
+            const ip = hostUri.split(':')[0];
+            return `http://${ip}:5000`;
+        }
     }
 
-    return 'http://10.17.244.82:5000';
+    return 'https://api.chrollomark.com';
 };
 
 const BASE_URL = getBaseUrl();
