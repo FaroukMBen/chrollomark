@@ -13,6 +13,8 @@ const reviewRoutes = require('./routes/reviews');
 const collectionRoutes = require('./routes/collections');
 const socialRoutes = require('./routes/social');
 const mangadexRoutes = require('./routes/mangadex');
+const supportRoutes = require('./routes/support');
+const devlogRoutes = require('./routes/devlog');
 
 const app = express();
 
@@ -32,6 +34,8 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/collections', collectionRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/mangadex', mangadexRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/devlog', devlogRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

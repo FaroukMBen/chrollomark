@@ -1,7 +1,7 @@
 // Fallback for using MaterialIcons on Android and web.
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolViewProps, SymbolWeight } from 'expo-symbols';
+import { SymbolViewProps } from 'expo-symbols';
 import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
@@ -23,6 +23,8 @@ const MAPPING = {
   'ellipsis': 'more-horiz',
   'arrow.left': 'arrow-back',
   'arrow.right': 'arrow-forward',
+  'arrow.up': 'arrow-upward',
+  'arrow.down': 'arrow-downward',
   'arrow.up.right': 'open-in-new',
   'xmark': 'close',
   'xmark.circle.fill': 'cancel',
@@ -47,6 +49,8 @@ const MAPPING = {
   'person.2.fill': 'people',
   'person.crop.circle': 'person',
   'person.badge.plus': 'person-add',
+  'person.badge.minus': 'person-remove',
+  'plus.square.on.square': 'content-copy',
 
   // Favorites & Rating
   'star.fill': 'star',
@@ -105,10 +109,27 @@ const MAPPING = {
 
   // Grid
   'square.grid.2x2.fill': 'grid-view',
+  'square.grid.3x3.fill': 'view-module',
+
+  // Hand/Voting
+  'hand.thumbsup': 'thumb-up-off-alt',
+  'hand.thumbsup.fill': 'thumb-up',
+  'hand.thumbsdown': 'thumb-down-off-alt',
+  'hand.thumbsdown.fill': 'thumb-down',
 
   // List  
   'list.bullet': 'format-list-bulleted',
   'line.3.horizontal.decrease': 'filter-list',
+  'textformat.abc': 'sort-by-alpha',
+  'minus.circle.fill': 'remove-circle',
+  'terminal.fill': 'terminal',
+  'list.bullet.rectangle.portrait': 'feed',
+  'questionmark.circle.fill': 'help',
+  'bubble.left.fill': 'chat-bubble',
+  'ant.fill': 'bug-report',
+  'link': 'link',
+  'arrow.counterclockwise': 'refresh',
+  'arrow.down.circle': 'file-download',
 } as IconMapping;
 
 /**
@@ -121,13 +142,12 @@ export function IconSymbol({
   size = 24,
   color,
   style,
-}: {
+}: Readonly<{
   name: IconSymbolName;
   size?: number;
   color: string | OpaqueColorValue;
   style?: StyleProp<TextStyle>;
-  weight?: SymbolWeight;
-}) {
+}>) {
   const mappedName = MAPPING[name];
   if (!mappedName) {
     // Fallback: show a generic icon instead of crashing

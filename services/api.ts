@@ -182,7 +182,7 @@ class ApiService {
     }
 
     async getStory(id: string) {
-        return this.request<{ story: any; userProgress: any; reviews: any[] }>(`/stories/${id}`);
+        return this.request<{ story: any; userProgress: any; reviews: any[]; isRecommended: boolean }>(`/stories/${id}`);
     }
 
     async updateStory(id: string, data: any) {
@@ -191,6 +191,18 @@ class ApiService {
 
     async deleteStory(id: string) {
         return this.request<any>(`/stories/${id}`, { method: 'DELETE' });
+    }
+
+    async likeStory(id: string) {
+        return this.request<{ isLiked: boolean; isDisliked: boolean; likesCount: number; dislikesCount: number }>(`/stories/${id}/like`, { method: 'POST' });
+    }
+
+    async dislikeStory(id: string) {
+        return this.request<{ isLiked: boolean; isDisliked: boolean; likesCount: number; dislikesCount: number }>(`/stories/${id}/dislike`, { method: 'POST' });
+    }
+
+    async recommendStory(storyId: string, message?: string) {
+        return this.request<{ message: string; isRecommended: boolean }>('/social/recommend', { method: 'POST', body: { storyId, message } });
     }
 
     // Progress
@@ -215,6 +227,10 @@ class ApiService {
 
     async incrementChapter(progressId: string) {
         return this.request<any>(`/progress/${progressId}/increment`, { method: 'PUT' });
+    }
+
+    async toggleFavorite(storyId: string) {
+        return this.request<{ isFavorite: boolean }>(`/progress/${storyId}/favorite`, { method: 'PUT' });
     }
 
     async removeFromLibrary(storyId: string) {
@@ -279,6 +295,10 @@ class ApiService {
         return this.request<any>(`/collections/${id}`, { method: 'DELETE' });
     }
 
+    async cloneCollection(id: string) {
+        return this.request<any>(`/collections/${id}/clone`, { method: 'POST' });
+    }
+
     async getUserCollections(userId: string) {
         return this.request<any[]>(`/collections/user/${userId}`);
     }
@@ -305,6 +325,10 @@ class ApiService {
             method: 'PUT',
             body: { action },
         });
+    }
+
+    async cancelFriendRequest(requestId: string) {
+        return this.request<any>(`/social/friend-request/${requestId}`, { method: 'DELETE' });
     }
 
     async removeFriend(userId: string) {
@@ -371,18 +395,17 @@ class ApiService {
         });
     }
 
-    // Collection story management
-    async addStoryToCollection(collectionId: string, storyId: string) {
-        return this.request<any>(`/collections/${collectionId}/stories`, {
-            method: 'PUT',
-            body: { storyId },
-        });
+    // Support & DevLog
+    async submitFeedback(data: { content: string; category?: string }) {
+        return this.request<any>('/support/feedback', { method: 'POST', body: data });
     }
 
-    async removeStoryFromCollection(collectionId: string, storyId: string) {
-        return this.request<any>(`/collections/${collectionId}/stories/${storyId}`, {
-            method: 'DELETE',
-        });
+    async submitBugReport(data: { title: string; description: string; images?: string[]; deviceInfo?: string }) {
+        return this.request<any>('/support/bug-report', { method: 'POST', body: data });
+    }
+
+    async getDevLogs() {
+        return this.request<any[]>('/devlog');
     }
 }
 
