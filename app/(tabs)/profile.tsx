@@ -1,3 +1,4 @@
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -58,6 +59,7 @@ export default function ProfileScreen() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -173,10 +175,7 @@ export default function ProfileScreen() {
   }, [isAuthenticated]);
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
-    ]);
+    setIsLogoutConfirmVisible(true);
   };
 
   const handleSync = async () => {
@@ -451,6 +450,50 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* ─── DEVELOPER HUB ─── */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <IconSymbol name="terminal.fill" size={16} color={colors.text} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Developer Hub</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.settingCard, styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => router.push('/profile/dev-log')}>
+            <View style={styles.settingHeader}>
+              <IconSymbol name="list.bullet.rectangle.portrait" size={15} color={colors.primary} />
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Dev Log & Roadmaps</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* ─── SUPPORT ─── */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <IconSymbol name="questionmark.circle.fill" size={16} color={colors.text} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Support & Feedback</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.settingCard, styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => router.push('/profile/feedback')}>
+            <View style={styles.settingHeader}>
+              <IconSymbol name="bubble.left.fill" size={15} color={colors.success} />
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Give Feedback</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.settingCard, styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+            onPress={() => router.push('/profile/report-bug')}>
+            <View style={styles.settingHeader}>
+              <IconSymbol name="ant.fill" size={15} color={colors.error} />
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Report a Bug</Text>
+            </View>
+            <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
         {/* ─── SETTINGS ─── */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
@@ -518,6 +561,16 @@ export default function ProfileScreen() {
             <IconSymbol name="chevron.right" size={14} color={colors.error} />
           </TouchableOpacity>
         </View>
+      <ConfirmModal
+        visible={isLogoutConfirmVisible}
+        title="Logout"
+        message="Are you sure you want to logout?"
+        onConfirm={() => {
+          setIsLogoutConfirmVisible(false);
+          logout();
+        }}
+        onCancel={() => setIsLogoutConfirmVisible(false)}
+      />
       </ScrollView>
     </SafeAreaView>
   );
