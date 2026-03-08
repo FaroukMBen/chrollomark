@@ -1,18 +1,22 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, Shadows, Spacing, StatusColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -37,26 +41,56 @@ export default function SocialScreen() {
 
   const [friends, setFriends] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
+  const [sentRequests, setSentRequests] = useState<any[]>([]);
   const [feed, setFeed] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'activity' | 'friends' | 'requests' | 'search'>('activity');
+  const [activeTab, setActiveTab] = useState<'activity' | 'friends' | 'requests'>('activity');
+  const [requestsTab, setRequestsTab] = useState<'received' | 'sent'>('received');
+  const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
+  const [seenFriendIds, setSeenFriendIds] = useState<Set<string>>(new Set());
+  const [isConfirmVisible, setIsConfirmVisible] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+
+  // Load seen friends from storage
+  useEffect(() => {
+    const loadSeen = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('seen_friend_ids');
+        if (stored) {
+          setSeenFriendIds(new Set(JSON.parse(stored)));
+        }
+      } catch (e) { console.log(e); }
+    };
+    loadSeen();
+  }, []);
+
+  const markFriendAsSeen = async (friendId: string) => {
+    if (seenFriendIds.has(friendId)) return;
+    const next = new Set(seenFriendIds).add(friendId);
+    setSeenFriendIds(next);
+    try {
+      await AsyncStorage.setItem('seen_friend_ids', JSON.stringify(Array.from(next)));
+    } catch (e) { console.log(e); }
+  };
 
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const [friendsData, requestsData, feedData] = await Promise.all([
+      const [friendsData, requestsData, sentRequestsData, feedData] = await Promise.all([
         api.getFriends(),
         api.getFriendRequests(),
-        api.getFeed().catch(() => ({ feed: [], recommendations: [] })),
+        api.getSentFriendRequests(),
+        api.getFeed().catch(() => ({ feed: [] })),
       ]);
       setFriends(friendsData);
       setRequests(requestsData);
+      setSentRequests(sentRequestsData);
       setFeed(feedData.feed || []);
-      setRecommendations(feedData.recommendations || []);
+      setRecommendations([]); // Removed recommendations functionality as requested
     } catch (error) {
       console.log('Error:', error);
     } finally {
@@ -102,6 +136,31 @@ export default function SocialScreen() {
     }
   };
 
+  const cancelRequest = async (requestId: string) => {
+    try {
+      await api.cancelFriendRequest(requestId);
+      showToast({ message: 'Request cancelled', type: 'info' });
+      await loadData();
+    } catch (error: any) {
+      showToast({ message: error.message, type: 'error' });
+    }
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmConfig({ title, message, onConfirm });
+    setIsConfirmVisible(true);
+  };
+
+  const removeFriend = async (friendId: string, username: string) => {
+    try {
+      await api.removeFriend(friendId);
+      showToast({ message: `${username} removed from friends`, type: 'info' });
+      await loadData();
+    } catch (error: any) {
+      showToast({ message: error.message, type: 'error' });
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -115,28 +174,37 @@ export default function SocialScreen() {
     );
   }
 
+  const newFriendsCount = friends.filter(f => !seenFriendIds.has(f._id)).length;
+
   const tabs = [
     { key: 'activity' as const, label: 'Activity', count: null, icon: 'flame.fill' },
-    { key: 'friends' as const, label: 'Friends', count: friends.length, icon: 'person.2.fill' },
-    { key: 'requests' as const, label: 'Requests', count: requests.length, icon: 'envelope.fill' },
-    { key: 'search' as const, label: 'Search', count: null, icon: 'magnifyingglass' },
+    { key: 'friends' as const, label: 'Friends', count: newFriendsCount > 0 ? newFriendsCount : null, icon: 'person.2.fill' },
+    { key: 'requests' as const, label: 'Requests', count: requests.length > 0 ? requests.length : null, icon: 'envelope.fill' },
   ];
 
   // --- Feed renderers ---
   const renderReviewItem = (item: any) => (
     <View key={item.id} style={[styles.feedCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-      <View style={styles.feedHeader}>
-        <View style={[styles.feedAvatar, { backgroundColor: colors.primary + '30' }]}>
-          <Text style={[styles.feedAvatarText, { color: colors.primary }]}>
-            {item.user?.username?.[0]?.toUpperCase()}
-          </Text>
-        </View>
+      <TouchableOpacity 
+        style={styles.feedHeader} 
+        onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
+        activeOpacity={0.7}
+      >
+        {item.user?.avatar ? (
+          <Image source={{ uri: item.user.avatar }} style={styles.feedAvatar} contentFit="cover" />
+        ) : (
+          <View style={[styles.feedAvatar, { backgroundColor: colors.primary + '30' }]}>
+            <Text style={[styles.feedAvatarText, { color: colors.primary }]}>
+              {item.user?.username?.[0]?.toUpperCase()}
+            </Text>
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user?.username}</Text>
           <Text style={[styles.feedAction, { color: colors.textSecondary }]}>reviewed a story</Text>
         </View>
         <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
-      </View>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.feedStoryCard, { backgroundColor: colors.surfaceElevated }]}
@@ -179,18 +247,26 @@ export default function SocialScreen() {
 
     return (
       <View key={item.id} style={[styles.feedCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        <View style={styles.feedHeader}>
-          <View style={[styles.feedAvatar, { backgroundColor: statusColor + '30' }]}>
-            <Text style={[styles.feedAvatarText, { color: statusColor }]}>
-              {item.user?.username?.[0]?.toUpperCase()}
-            </Text>
-          </View>
+        <TouchableOpacity 
+          style={styles.feedHeader}
+          onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
+          activeOpacity={0.7}
+        >
+          {item.user?.avatar ? (
+            <Image source={{ uri: item.user.avatar }} style={styles.feedAvatar} contentFit="cover" />
+          ) : (
+            <View style={[styles.feedAvatar, { backgroundColor: statusColor + '30' }]}>
+              <Text style={[styles.feedAvatarText, { color: statusColor }]}>
+                {item.user?.username?.[0]?.toUpperCase()}
+              </Text>
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user?.username}</Text>
             <Text style={[styles.feedAction, { color: colors.textSecondary }]}>{actionVerb}</Text>
           </View>
           <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.feedStoryRow, { backgroundColor: colors.surfaceElevated }]}
@@ -221,40 +297,114 @@ export default function SocialScreen() {
     );
   };
 
+  const renderRecommendationItem = (item: any) => (
+    <View key={item.id} style={[styles.feedCard, styles.recoHighlightCard, { backgroundColor: colors.surface, borderColor: colors.accent + '40' }]}>
+      <LinearGradient 
+        colors={[colors.accent + '15', 'transparent']} 
+        start={{ x: 0, y: 0 }} 
+        end={{ x: 1, y: 1 }} 
+        style={StyleSheet.absoluteFill} 
+      />
+      <TouchableOpacity 
+        style={styles.feedHeader}
+        onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
+        activeOpacity={0.7}
+      >
+        {item.user?.avatar ? (
+          <Image source={{ uri: item.user.avatar }} style={styles.feedAvatar} contentFit="cover" />
+        ) : (
+          <View style={[styles.feedAvatar, { backgroundColor: colors.accent + '30' }]}>
+            <Text style={[styles.feedAvatarText, { color: colors.accent }]}>
+              {item.user?.username?.[0]?.toUpperCase()}
+            </Text>
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user?.username}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <IconSymbol name="sparkles" size={10} color={colors.accent} />
+            <Text style={[styles.feedAction, { color: colors.accent, fontWeight: '700' }]}>RECOMMENDED THIS STORY</Text>
+          </View>
+        </View>
+        <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.feedStoryCard, { backgroundColor: colors.surfaceElevated, borderLeftWidth: 3, borderLeftColor: colors.accent }]}
+        onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
+        activeOpacity={0.7}>
+        {item.story?.coverImage ? (
+          <Image source={{ uri: item.story.coverImage }} style={styles.feedStoryCover} contentFit="cover" />
+        ) : (
+          <View style={[styles.feedStoryCover, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+            <IconSymbol name="book.fill" size={20} color={colors.textSecondary} />
+          </View>
+        )}
+        <View style={styles.feedStoryInfo}>
+          <Text style={[styles.feedStoryTitle, { color: colors.text }]} numberOfLines={1}>
+            {item.story?.title || 'Unknown'}
+          </Text>
+          <Text style={[styles.feedStoryAuthor, { color: colors.textSecondary }]} numberOfLines={1}>
+            {item.story?.author || 'Unknown Author'}
+          </Text>
+          <View style={[styles.typeBadge, { backgroundColor: colors.accent + '20', alignSelf: 'flex-start', marginTop: 4, marginBottom: item.message ? 8 : 0 }]}>
+              <Text style={[styles.typeText, { color: colors.accent }]}>MUST READ</Text>
+          </View>
+          {item.message && (
+            <View style={styles.feedRecoMessage}>
+              <Text style={[styles.feedReviewText, { color: colors.text, marginTop: 0, fontStyle: 'normal' }]}>"{item.message}"</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Social</Text>
-      </View>
+      <View style={styles.fixedHeader}>
+        <View style={styles.header}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Social</Text>
+          <TouchableOpacity
+            style={[styles.inviteBtn, { backgroundColor: colors.primary }]}
+            onPress={() => setIsInviteModalVisible(true)}>
+            <IconSymbol name="person.badge.plus" size={18} color="#FFF" />
+          </TouchableOpacity>
+        </View>
 
-      {/* Tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll} contentContainerStyle={styles.tabContainer}>
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.key;
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={[
-                styles.tab,
-                {
-                  backgroundColor: isActive ? colors.primary + '15' : 'transparent',
-                  borderColor: isActive ? colors.primary : 'transparent',
-                },
-              ]}
-              onPress={() => setActiveTab(tab.key)}>
-              <IconSymbol name={tab.icon as any} size={15} color={isActive ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.tabText, { color: isActive ? colors.primary : colors.textSecondary }]}>
-                {tab.label}
-              </Text>
-              {tab.count !== null && tab.count > 0 && (
-                <View style={[styles.tabBadge, { backgroundColor: isActive ? colors.primary : colors.textSecondary }]}>
-                  <Text style={styles.tabBadgeText}>{tab.count}</Text>
+        {/* Horizontal Sub-Navigation (Scrollable) */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          style={[styles.tabBar, { borderBottomColor: 'rgba(148, 163, 184, 0.1)' }]}
+          contentContainerStyle={styles.tabBarContainer}
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={styles.tabItem}
+                onPress={() => setActiveTab(tab.key)}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <IconSymbol name={tab.icon as any} size={15} color={isActive ? colors.primary : colors.textSecondary} />
+                  <Text style={[styles.tabLabel, { color: isActive ? colors.text : colors.textSecondary }]}>
+                    {tab.label}
+                  </Text>
+                  {tab.count !== null && (
+                    <View style={[styles.tabCounter, { backgroundColor: isActive ? colors.primary : colors.textSecondary + '40' }]}>
+                      <Text style={styles.tabCounterText}>{tab.count}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+                {isActive && <View style={[styles.activeIndicator, { backgroundColor: colors.primary }]} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {isLoading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
@@ -267,42 +417,6 @@ export default function SocialScreen() {
           {/* ===  ACTIVITY TAB  === */}
           {activeTab === 'activity' && (
             <>
-              {/* Recommendations */}
-              {recommendations.length > 0 && (
-                <View style={styles.recoSection}>
-                  <View style={styles.recoHeader}>
-                    <IconSymbol name="sparkles" size={18} color={colors.accent} />
-                    <Text style={[styles.recoTitle, { color: colors.text }]}>Recommended by Friends</Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recoList}>
-                    {recommendations.map((rec) => (
-                      <TouchableOpacity
-                        key={rec.story._id}
-                        style={[styles.recoCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-                        onPress={() => router.push(`/story/${rec.story._id}` as any)}
-                        activeOpacity={0.7}>
-                        {rec.story.coverImage ? (
-                          <Image source={{ uri: rec.story.coverImage }} style={styles.recoCover} contentFit="cover" />
-                        ) : (
-                          <View style={[styles.recoCover, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
-                            <IconSymbol name="book.fill" size={24} color={colors.textSecondary} />
-                          </View>
-                        )}
-                        <Text style={[styles.recoStoryTitle, { color: colors.text }]} numberOfLines={2}>
-                          {rec.story.title}
-                        </Text>
-                        <View style={styles.recoFriends}>
-                          <IconSymbol name="person.2.fill" size={11} color={colors.primary} />
-                          <Text style={[styles.recoFriendsText, { color: colors.primary }]}>
-                            {rec.friendCount} {rec.friendCount === 1 ? 'friend' : 'friends'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
               {/* Feed */}
               {feed.length === 0 ? (
                 <View style={styles.emptyState}>
@@ -320,6 +434,7 @@ export default function SocialScreen() {
                   {feed.map((item) => {
                     if (item.type === 'review') return renderReviewItem(item);
                     if (item.type === 'progress') return renderProgressItem(item);
+                    if (item.type === 'recommendation') return renderRecommendationItem(item);
                     return null;
                   })}
                 </>
@@ -329,7 +444,11 @@ export default function SocialScreen() {
 
           {/* ===  FRIENDS TAB  === */}
           {activeTab === 'friends' && (
-            friends.length === 0 ? (
+            <>
+              <View style={styles.friendsHeader}>
+                <Text style={[styles.friendsCountText, { color: colors.textSecondary }]}>{friends.length} {friends.length === 1 ? 'Friend' : 'Friends'}</Text>
+              </View>
+              {friends.length === 0 ? (
               <View style={styles.emptyState}>
                 <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
                   <IconSymbol name="person.2.fill" size={40} color={colors.textSecondary} />
@@ -340,134 +459,313 @@ export default function SocialScreen() {
                 </Text>
                 <TouchableOpacity
                   style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => setActiveTab('search')}
+                  onPress={() => setIsInviteModalVisible(true)}
                   activeOpacity={0.8}>
-                  <IconSymbol name="magnifyingglass" size={16} color="#FFF" />
-                  <Text style={styles.emptyBtnText}>Find Friends</Text>
+                  <IconSymbol name="person.badge.plus" size={16} color="#FFF" />
+                  <Text style={styles.emptyBtnText}>Invite Friends</Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              friends.map((friend) => (
-                <TouchableOpacity
-                  key={friend._id}
-                  style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-                  onPress={() => router.push(`/user/${friend._id}` as any)}
-                  activeOpacity={0.7}>
-                  <View style={[styles.avatar, { backgroundColor: colors.primary + '30' }]}>
-                    <Text style={[styles.avatarText, { color: colors.primary }]}>
-                      {friend.username?.[0]?.toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.userInfo}>
-                    <Text style={[styles.userName, { color: colors.text }]}>{friend.username}</Text>
-                    <Text style={[styles.userBio, { color: colors.textSecondary }]}>
-                      {friend.bio || 'No bio'}
-                    </Text>
-                  </View>
-                  <IconSymbol name="chevron.right" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-              ))
-            )
+              ) : (
+                friends.map((friend) => {
+                  const isNew = !seenFriendIds.has(friend._id);
+                  return (
+                    <TouchableOpacity
+                      key={friend._id}
+                      style={[
+                        styles.userCard, 
+                        { backgroundColor: colors.surface, borderColor: isNew ? colors.primary + '60' : colors.cardBorder },
+                        isNew && { borderWidth: 1.5 }
+                      ]}
+                      onPress={() => {
+                        markFriendAsSeen(friend._id);
+                        router.push(`/user/${friend._id}` as any);
+                      }}
+                      activeOpacity={0.7}>
+                      {friend.avatar ? (
+                        <Image source={{ uri: friend.avatar }} style={styles.avatar} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.avatar, { backgroundColor: colors.primary + '30' }]}>
+                          <Text style={[styles.avatarText, { color: colors.primary }]}>
+                            {friend.username?.[0]?.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.userInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={[styles.userName, { color: colors.text }]}>{friend.username}</Text>
+                          {isNew && (
+                            <View style={[styles.newBadge, { backgroundColor: colors.primary }]}>
+                              <Text style={styles.newBadgeText}>NEW</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[styles.userBio, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {friend.bio || 'No bio'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity 
+                        style={[styles.removeFriendMiniBtn, { borderColor: colors.border }]}
+                        onPress={() => showConfirm('Remove Friend', `Are you sure you want to remove ${friend.username}?`, () => removeFriend(friend._id, friend.username))}
+                      >
+                        <IconSymbol name="person.badge.minus" size={14} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                      <IconSymbol name="chevron.right" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </>
           )}
 
           {/* ===  REQUESTS TAB  === */}
           {activeTab === 'requests' && (
-            requests.length === 0 ? (
-              <View style={styles.emptyState}>
-                <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
-                  <IconSymbol name="envelope.fill" size={40} color={colors.textSecondary} />
-                </View>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>No pending requests</Text>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  You will see friend requests here
-                </Text>
+            <>
+              <View style={[styles.segmentedControl, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, requestsTab === 'received' && { backgroundColor: colors.surfaceElevated }]}
+                  onPress={() => setRequestsTab('received')}>
+                  <Text style={[styles.segmentBtnText, { color: requestsTab === 'received' ? colors.text : colors.textSecondary }]}>
+                    Received {requests.length > 0 && `(${requests.length})`}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, requestsTab === 'sent' && { backgroundColor: colors.surfaceElevated }]}
+                  onPress={() => setRequestsTab('sent')}>
+                  <Text style={[styles.segmentBtnText, { color: requestsTab === 'sent' ? colors.text : colors.textSecondary }]}>
+                    Sent {sentRequests.length > 0 && `(${sentRequests.length})`}
+                  </Text>
+                </TouchableOpacity>
               </View>
-            ) : (
-              requests.map((request) => (
-                <View
-                  key={request._id}
-                  style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                  <View style={[styles.avatar, { backgroundColor: colors.accent + '30' }]}>
-                    <Text style={[styles.avatarText, { color: colors.accent }]}>
-                      {request.from.username?.[0]?.toUpperCase()}
+
+              {requestsTab === 'received' ? (
+                requests.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
+                      <IconSymbol name="envelope.fill" size={40} color={colors.textSecondary} />
+                    </View>
+                    <Text style={[styles.emptyTitle, { color: colors.text }]}>No pending requests</Text>
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                      You will see friend requests here
                     </Text>
                   </View>
-                  <View style={styles.userInfo}>
-                    <Text style={[styles.userName, { color: colors.text }]}>
-                      {request.from.username}
+                ) : (
+                  requests.map((request) => (
+                    <View
+                      key={request._id}
+                      style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                      {request.from.avatar ? (
+                        <Image source={{ uri: request.from.avatar }} style={styles.avatar} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.avatar, { backgroundColor: colors.accent + '30' }]}>
+                          <Text style={[styles.avatarText, { color: colors.accent }]}>
+                            {request.from.username?.[0]?.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.userInfo}>
+                        <Text style={[styles.userName, { color: colors.text }]}>
+                          {request.from.username}
+                        </Text>
+                        <View style={styles.requestActions}>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                            onPress={() => respondToRequest(request._id, 'accept')}
+                            activeOpacity={0.8}>
+                            <IconSymbol name="checkmark" size={14} color="#FFF" />
+                            <Text style={styles.actionBtnText}>Accept</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+                            onPress={() => respondToRequest(request._id, 'decline')}
+                            activeOpacity={0.8}>
+                            <Text style={[styles.actionBtnText, { color: colors.textSecondary }]}>Decline</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )
+              ) : (
+                sentRequests.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
+                      <IconSymbol name="paperplane.fill" size={40} color={colors.textSecondary} />
+                    </View>
+                    <Text style={[styles.emptyTitle, { color: colors.text }]}>No sent requests</Text>
+                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                      You haven't sent any friend requests
                     </Text>
-                    <View style={styles.requestActions}>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                        onPress={() => respondToRequest(request._id, 'accept')}
-                        activeOpacity={0.8}>
-                        <IconSymbol name="checkmark" size={14} color="#FFF" />
-                        <Text style={styles.actionBtnText}>Accept</Text>
-                      </TouchableOpacity>
+                  </View>
+                ) : (
+                  sentRequests.map((request) => (
+                    <View
+                      key={request._id}
+                      style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                      {request.to.avatar ? (
+                        <Image source={{ uri: request.to.avatar }} style={styles.avatar} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.avatar, { backgroundColor: colors.primary + '30' }]}>
+                          <Text style={[styles.avatarText, { color: colors.primary }]}>
+                            {request.to.username?.[0]?.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.userInfo}>
+                        <Text style={[styles.userName, { color: colors.text }]}>
+                          {request.to.username}
+                        </Text>
+                        <Text style={[styles.userBio, { color: colors.textSecondary }]}>
+                          Pending Request
+                        </Text>
+                      </View>
                       <TouchableOpacity
                         style={[styles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
-                        onPress={() => respondToRequest(request._id, 'decline')}
+                        onPress={() => cancelRequest(request._id)}
                         activeOpacity={0.8}>
-                        <Text style={[styles.actionBtnText, { color: colors.textSecondary }]}>Decline</Text>
+                        <Text style={[styles.actionBtnText, { color: colors.textSecondary }]}>Cancel</Text>
                       </TouchableOpacity>
                     </View>
-                  </View>
-                </View>
-              ))
-            )
-          )}
-
-          {/* ===  SEARCH TAB  === */}
-          {activeTab === 'search' && (
-            <>
-              <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <IconSymbol name="magnifyingglass" size={18} color={colors.textSecondary} />
-                <TextInput
-                  style={[styles.searchInput, { color: colors.text }]}
-                  placeholder="Search by username..."
-                  placeholderTextColor={colors.textSecondary + '80'}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  onSubmitEditing={searchUsers}
-                  returnKeyType="search"
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-                    <IconSymbol name="xmark.circle.fill" size={18} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
-              </View>
-              {searchResults.length === 0 && searchQuery.length === 0 && (
-                <View style={styles.emptyState}>
-                  <IconSymbol name="magnifyingglass" size={40} color={colors.textSecondary} />
-                  <Text style={[styles.emptyText, { color: colors.textSecondary, marginTop: Spacing.md }]}>
-                    Search for users by their username
-                  </Text>
-                </View>
+                  ))
+                )
               )}
-              {searchResults.map((user) => (
-                <View
-                  key={user._id}
-                  style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                  <View style={[styles.avatar, { backgroundColor: colors.primary + '30' }]}>
-                    <Text style={[styles.avatarText, { color: colors.primary }]}>{user.username?.[0]?.toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.userInfo}>
-                    <Text style={[styles.userName, { color: colors.text }]}>{user.username}</Text>
-                    <Text style={[styles.userBio, { color: colors.textSecondary }]}>
-                      {user.bio || 'No bio'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.addFriendBtn, { backgroundColor: colors.primary }]}
-                    onPress={() => sendRequest(user._id)}
-                    activeOpacity={0.8}>
-                    <IconSymbol name="person.badge.plus" size={16} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
-              ))}
             </>
           )}
+
+      {/* Invite/Add Friend Modal */}
+      <Modal
+        visible={isInviteModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsInviteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Invite Friends</Text>
+              <TouchableOpacity onPress={() => { setIsInviteModalVisible(false); setSearchQuery(''); setSearchResults([]); }}>
+                <IconSymbol name="xmark" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.searchBar, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <IconSymbol name="magnifyingglass" size={18} color={colors.textSecondary} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search by username..."
+                placeholderTextColor={colors.textSecondary + '80'}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onSubmitEditing={searchUsers}
+                returnKeyType="search"
+                autoFocus={true}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
+                  <IconSymbol name="xmark.circle.fill" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              {searchResults.length === 0 && searchQuery.length > 0 && !isLoading && (
+                <Text style={[styles.modalEmptyText, { color: colors.textSecondary }]}>No users found.</Text>
+              )}
+              
+               {searchResults.map((user) => {
+                const isFriend = friends.some(f => f._id === user._id);
+                const sentReq = sentRequests.find(r => r.to._id === user._id);
+                const receivedReq = requests.find(r => r.from._id === user._id);
+                
+                return (
+                  <View
+                    key={user._id}
+                    style={[styles.userCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.cardBorder }]}>
+                    {user.avatar ? (
+                      <Image source={{ uri: user.avatar }} style={styles.avatar} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.avatar, { backgroundColor: colors.primary + '30' }]}>
+                        <Text style={[styles.avatarText, { color: colors.primary }]}>{user.username?.[0]?.toUpperCase()}</Text>
+                      </View>
+                    )}
+                    <View style={styles.userInfo}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.userName, { color: colors.text }]}>{user.username}</Text>
+                        {isFriend && (
+                          <View style={[styles.statusTag, { backgroundColor: colors.success + '20' }]}>
+                            <Text style={[styles.statusTagText, { color: colors.success }]}>FRIEND</Text>
+                          </View>
+                        )}
+                        {sentReq && (
+                          <View style={[styles.statusTag, { backgroundColor: colors.primary + '20' }]}>
+                            <Text style={[styles.statusTagText, { color: colors.primary }]}>SENT</Text>
+                          </View>
+                        )}
+                        {receivedReq && (
+                          <View style={[styles.statusTag, { backgroundColor: colors.accent + '20' }]}>
+                            <Text style={[styles.statusTagText, { color: colors.accent }]}>RECEIVED</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={[styles.userBio, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {user.bio || 'No bio'}
+                      </Text>
+                    </View>
+
+                    {isFriend ? (
+                      <TouchableOpacity
+                        style={[styles.addFriendBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+                        onPress={() => showConfirm('Remove Friend', `Are you sure you want to remove ${user.username}?`, () => removeFriend(user._id, user.username))}
+                        activeOpacity={0.8}>
+                        <IconSymbol name="person.badge.minus" size={16} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    ) : sentReq ? (
+                      <TouchableOpacity
+                        style={[styles.addFriendBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+                        onPress={() => cancelRequest(sentReq._id)}
+                        activeOpacity={0.8}>
+                        <IconSymbol name="xmark" size={16} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    ) : receivedReq ? (
+                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                        <TouchableOpacity
+                          style={[styles.addFriendBtnMini, { backgroundColor: colors.primary }]}
+                          onPress={() => respondToRequest(receivedReq._id, 'accept')}
+                          activeOpacity={0.8}>
+                          <IconSymbol name="checkmark" size={12} color="#FFF" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.addFriendBtnMini, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+                          onPress={() => respondToRequest(receivedReq._id, 'decline')}
+                          activeOpacity={0.8}>
+                          <IconSymbol name="xmark" size={12} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.addFriendBtn, { backgroundColor: colors.primary }]}
+                        onPress={() => sendRequest(user._id)}
+                        activeOpacity={0.8}>
+                        <IconSymbol name="person.badge.plus" size={16} color="#FFF" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <ConfirmModal
+        visible={isConfirmVisible}
+        title={confirmConfig?.title || ''}
+        message={confirmConfig?.message || ''}
+        onConfirm={() => {
+          confirmConfig?.onConfirm();
+          setIsConfirmVisible(false);
+        }}
+        onCancel={() => setIsConfirmVisible(false)}
+      />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -477,38 +775,68 @@ export default function SocialScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
+  fixedHeader: {
+    paddingTop: Spacing.xs,
+    backgroundColor: 'transparent',
   },
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  tabScroll: { maxHeight: 50, marginBottom: Spacing.sm },
-  tabContainer: {
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+  pageTitle: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  inviteBtn: {
+    width: 44,
+    height: 44,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-  },
-  tabText: { fontSize: 13, fontWeight: '600' },
-  tabBadge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 5,
+    ...Shadows.sm,
   },
-  tabBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
-  content: { paddingHorizontal: Spacing.lg, paddingBottom: 100 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  tabBar: {
+    borderBottomWidth: 1,
+    height: 52,
+  },
+  tabBarContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    flexGrow: 1,
+    alignItems: 'center',
+  },
+  tabItem: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    flex: 1,
+  },
+  tabLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: -1,
+    width: '100%',
+    height: 3,
+    borderRadius: 2,
+  },
+  tabCounter: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    minWidth: 16,
+    alignItems: 'center',
+  },
+  tabCounterText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 100 },
 
   // --- Feed Styles ---
   feedSectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: Spacing.md, marginTop: Spacing.sm },
@@ -517,6 +845,15 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.md,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  recoHighlightCard: {
+    borderWidth: 1.5,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
   },
   feedHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
   feedAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
@@ -528,6 +865,21 @@ const styles = StyleSheet.create({
   feedStoryCover: { width: '100%', height: 120, borderRadius: BorderRadius.sm, marginBottom: Spacing.sm },
   feedStoryInfo: { gap: 4 },
   feedStoryTitle: { fontSize: 14, fontWeight: '700' },
+  feedStoryAuthor: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#94A3B8',
+    marginBottom: 2,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  typeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
   feedReviewText: { fontSize: 13, lineHeight: 19, fontStyle: 'italic', marginTop: 4 },
   starsRow: { flexDirection: 'row', gap: 2 },
   feedStoryRow: { flexDirection: 'row', borderRadius: BorderRadius.md, padding: Spacing.sm, gap: Spacing.sm, alignItems: 'center' },
@@ -536,6 +888,14 @@ const styles = StyleSheet.create({
   feedStatusPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.full },
   feedStatusText: { fontSize: 10, fontWeight: '700' },
   feedChapter: { fontSize: 12, fontWeight: '600' },
+  feedRecoMessage: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+  },
 
   // --- Recommendations ---
   recoSection: { marginBottom: Spacing.lg },
@@ -583,6 +943,16 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   searchInput: { flex: 1, fontSize: 15 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { height: '80%', borderTopLeftRadius: BorderRadius.xl, borderTopRightRadius: BorderRadius.xl, padding: Spacing.lg },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
+  modalTitle: { fontSize: 24, fontWeight: '800' },
+  modalScroll: { paddingBottom: 40 },
+  modalEmptyText: { textAlign: 'center', marginTop: 40, fontSize: 14 },
+  friendsHeader: { marginBottom: Spacing.md, paddingHorizontal: 4 },
+  friendsCountText: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  newBadge: { paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 },
+  newBadgeText: { color: '#FFF', fontSize: 8, fontWeight: '900' },
   addFriendBtn: {
     width: 40,
     height: 40,
@@ -613,4 +983,56 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   emptyBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  segmentedControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 6,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: BorderRadius.md,
+  },
+  segmentBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  removeFriendMiniBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.sm,
+  },
+  statusTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusTagText: {
+    fontSize: 8,
+    fontWeight: '800',
+  },
+  addFriendBtnMini: {
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  confirmContent: { width: '100%', borderRadius: BorderRadius.xl, padding: Spacing.xl },
+  confirmTitle: { fontSize: 18, fontWeight: '800', marginBottom: Spacing.sm },
+  confirmMessage: { fontSize: 14, lineHeight: 20, marginBottom: Spacing.xl },
+  confirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.md },
+  confirmBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: BorderRadius.md },
+  confirmBtnDestructive: { borderRadius: BorderRadius.md },
+  confirmBtnText: { fontSize: 14, fontWeight: '600' },
+  confirmBtnTextMain: { color: '#FFF', fontSize: 14, fontWeight: '700' },
 });

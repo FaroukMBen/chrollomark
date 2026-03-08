@@ -3,6 +3,7 @@ const User = require('../models/User');
 const FriendRequest = require('../models/FriendRequest');
 const ReadingProgress = require('../models/ReadingProgress');
 const Review = require('../models/Review');
+const Recommendation = require('../models/Recommendation');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -142,6 +143,28 @@ router.put('/friend-request/:id', auth, async (req, res) => {
     }
 });
 
+// @route   DELETE /api/social/friend-request/:id
+// @desc    Cancel or delete a friend request
+router.delete('/friend-request/:id', auth, async (req, res) => {
+    try {
+        const request = await FriendRequest.findById(req.params.id);
+        if (!request) return res.status(404).json({ message: 'Request not found' });
+
+        // Party must be sender or receiver
+        if (
+            request.from.toString() !== req.user._id.toString() &&
+            request.to.toString() !== req.user._id.toString()
+        ) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        await FriendRequest.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Friend request removed' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // @route   DELETE /api/social/friend/:userId
 // @desc    Remove a friend
 router.delete('/friend/:userId', auth, async (req, res) => {
@@ -196,6 +219,33 @@ router.get('/user/:id', auth, async (req, res) => {
             (f) => f.toString() === req.params.id
         );
 
+        // Check for pending requests
+        const pendingSentRequest = await FriendRequest.findOne({
+            from: req.user._id,
+            to: req.params.id,
+            status: 'pending'
+        });
+
+        const pendingReceivedRequest = await FriendRequest.findOne({
+            from: req.params.id,
+            to: req.user._id,
+            status: 'pending'
+        });
+
+        // Get mutual friends
+        const currentUser = await User.findById(req.user._id);
+        const targetUserFriends = user.friends.map(f => f.toString());
+        const currentUserFriendsSet = new Set(currentUser.friends.map(f => f.toString()));
+
+        const mutualFriendIds = targetUserFriends.filter(id => currentUserFriendsSet.has(id));
+        const mutualFriends = await User.find({ _id: { $in: mutualFriendIds } }).select('username avatar bio');
+
+        const requestStatus = {
+            sent: !!pendingSentRequest,
+            received: !!pendingReceivedRequest,
+            requestId: pendingSentRequest?._id || pendingReceivedRequest?._id
+        };
+
         // Get reading stats
         const progressList = await ReadingProgress.find({ user: req.params.id });
         const stats = {
@@ -208,6 +258,8 @@ router.get('/user/:id', auth, async (req, res) => {
         res.json({
             user,
             isFriend,
+            requestStatus,
+            mutualFriends,
             stats,
             friendCount: user.friends.length,
         });
@@ -274,6 +326,16 @@ router.get('/feed', auth, async (req, res) => {
             .populate('user', 'username avatar')
             .populate('story', 'title coverImage type');
 
+        // 3) Friend recommendations (last 30 days)
+        const recentRecommendations = await Recommendation.find({
+            user: { $in: friendIds },
+            createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        })
+            .sort('-createdAt')
+            .limit(20)
+            .populate('user', 'username avatar')
+            .populate('story', 'title coverImage type author');
+
         // Build unified feed sorted by date
         const feed = [];
 
@@ -300,6 +362,17 @@ router.get('/feed', auth, async (req, res) => {
                 status: progress.status,
                 currentChapter: progress.currentChapter,
                 timestamp: progress.lastReadDate || progress.updatedAt,
+            });
+        }
+
+        for (const rec of recentRecommendations) {
+            feed.push({
+                type: 'recommendation',
+                id: `rec-${rec._id}`,
+                user: rec.user,
+                story: rec.story,
+                message: rec.message || '',
+                timestamp: rec.createdAt,
             });
         }
 
@@ -341,6 +414,32 @@ router.get('/feed', auth, async (req, res) => {
         res.json({ feed: feed.slice(0, 50), recommendations });
     } catch (error) {
         console.error('Feed error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+// @route   POST /api/social/recommend
+// @desc    Recommend a story to all friends
+router.post('/recommend', auth, async (req, res) => {
+    try {
+        const { storyId, message } = req.body;
+        if (!storyId) return res.status(400).json({ message: 'Story ID is required' });
+
+        let recommendation = await Recommendation.findOne({ user: req.user._id, story: storyId });
+
+        if (recommendation) {
+            await Recommendation.deleteOne({ _id: recommendation._id });
+            res.json({ message: 'Recommendation removed', isRecommended: false });
+        } else {
+            recommendation = new Recommendation({
+                user: req.user._id,
+                story: storyId,
+                message: message || '',
+            });
+            await recommendation.save();
+            res.json({ message: 'Story recommended to friends!', isRecommended: true });
+        }
+    } catch (error) {
+        console.error('Recommend error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
