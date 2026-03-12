@@ -17,7 +17,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.faroukmben.chrollomark"
     },
     "web": {
       "output": "static",
@@ -41,6 +41,12 @@
     "experiments": {
       "typedRoutes": false,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "525372f4-0bbc-4f73-9693-6e5f468d1584"
+      }
     }
   }
 }

@@ -69,8 +69,8 @@ class ApiService {
         } = {}
     ): Promise<T> {
         const { method = 'GET', body, params } = options;
-
         let url = `${this.baseUrl}${endpoint}`;
+
         if (params) {
             const queryString = new URLSearchParams(params).toString();
             url += `?${queryString}`;
@@ -78,58 +78,108 @@ class ApiService {
 
         const isFormData = body instanceof FormData;
         const headers = await this.getHeaders(isFormData);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        let requestBody: any = undefined;
+        if (body) {
+            requestBody = isFormData ? body : JSON.stringify(body);
+        }
 
         const config: RequestInit = {
             method,
             headers,
+            signal: controller.signal,
+            body: requestBody,
         };
-
-        if (body) {
-            config.body = isFormData ? body : JSON.stringify(body);
-        }
 
         try {
             const response = await fetch(url, config);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Something went wrong');
-            }
-
-            // Cache GET requests
-            if (method === 'GET') {
-                await offlineStore.setCache(url, data);
-            }
-
-            return data as T;
+            clearTimeout(timeout);
+            return await this.handleResponse<T>(response, url);
         } catch (error: any) {
-            if (
-                error.message === 'Network request failed' ||
-                error.message.includes('Network')
-            ) {
-                if (method === 'GET') {
-                    const cached = await offlineStore.getCache(url);
-                    if (cached) return cached as T;
-                    throw new Error('Offline. No cached data available.');
-                } else if (method === 'POST' || method === 'PUT' || method === 'DELETE') {
-                    // Do not store auth mutations offline (login/register)
-                    if (!url.includes('/auth/') && !isFormData && body) {
-                        let description = 'Update data';
-                        if (url.includes('progress')) description = 'Update progress';
-                        if (url.includes('collections')) description = 'Update collection';
-
-                        await offlineStore.addMutation({
-                            endpoint: url.replace(this.baseUrl, ''),
-                            options: { method, body },
-                            description
-                        });
-                        throw new Error('You are offline. Change saved locally and will be synced later.');
-                    }
-                }
-                throw new Error('Unable to connect to server. Please check your connection.');
-            }
-            throw error;
+            clearTimeout(timeout);
+            return await this.handleError<T>(error, url, method, body, isFormData);
         }
+    }
+
+    private async handleResponse<T>(response: Response, url: string): Promise<T> {
+        let data: any;
+        const contentType = response.headers.get('content-type');
+
+        try {
+            if (contentType?.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                data = { message: text || `Server returned ${response.status}` };
+            }
+        } catch (e) {
+            console.error('API Response Parse Error:', e);
+            data = { message: `Failed to parse response (Status: ${response.status})` };
+        }
+
+        if (!response.ok) {
+            if (response.status === 401 && !url.includes('/auth/login')) {
+                await this.setToken(null);
+                throw new Error('Session expired. Please log in again.');
+            }
+            throw new Error(data.message || `Request failed with status ${response.status}`);
+        }
+
+        if (response.status >= 200 && response.status < 300 && url.includes('GET')) {
+            await offlineStore.setCache(url, data);
+        }
+
+        return data as T;
+    }
+
+    private async handleError<T>(
+        error: any,
+        url: string,
+        method: string,
+        body: any,
+        isFormData: boolean
+    ): Promise<T> {
+        if (error.name === 'AbortError') {
+            throw new Error('Connection timed out. The server is taking too long to respond.');
+        }
+
+        const isNetworkError =
+            error.message === 'Network request failed' ||
+            error.message.includes('Network') ||
+            error.message.includes('fetch');
+
+        if (isNetworkError) {
+            // Handle offline scenarios
+            if (method === 'GET') {
+                const cached = await offlineStore.getCache(url);
+                if (cached) return cached as T;
+                throw new Error('You appear to be offline and no cached data is available.');
+            }
+
+            // Sync queue for mutations
+            if (['POST', 'PUT', 'DELETE'].includes(method) && !url.includes('/auth/') && !isFormData && body) {
+                await this.queueMutation(url, method, body);
+                throw new Error('Action saved locally. It will sync when you are back online.');
+            }
+
+            throw new Error('Cannot connect to the server. Please check your internet connection.');
+        }
+
+        throw error;
+    }
+
+    private async queueMutation(url: string, method: string, body: any) {
+        let description = 'Update data';
+        if (url.includes('progress')) description = 'Update progress';
+        if (url.includes('collections')) description = 'Update collection';
+
+        await offlineStore.addMutation({
+            endpoint: url.replace(this.baseUrl, ''),
+            options: { method, body },
+            description
+        });
     }
 
     async syncMutations(): Promise<number> {
@@ -144,7 +194,6 @@ class ApiService {
                 synced++;
             } catch (err: any) {
                 if (!err.message?.includes('Network')) {
-                    // Remove if it's a server error like 400 since it won't ever succeed
                     await offlineStore.removeMutation(m.id);
                 }
             }
