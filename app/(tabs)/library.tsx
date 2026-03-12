@@ -216,8 +216,16 @@ export default function LibraryScreen() {
       </View>
 
       <View style={styles.collDetails}>
-        <Text style={[styles.collName, { color: colors.text }]} numberOfLines={1}>{coll.name}</Text>
+        <View style={styles.collTitleRow}>
+          <Text style={[styles.collName, { color: colors.text, flex: 1 }]} numberOfLines={1}>{coll.name}</Text>
+          <IconSymbol 
+            name={coll.isPublic ? "globe" : "lock.fill"} 
+            size={12} 
+            color={colors.textSecondary} 
+          />
+        </View>
         <View style={styles.collMetaRow}>
+          <IconSymbol name="books.vertical.fill" size={12} color={colors.textSecondary} style={{ marginRight: 4 }} />
           <Text style={[styles.collCount, { color: colors.textSecondary }]}>
             {coll.stories?.length || 0} {coll.stories?.length === 1 ? 'title' : 'titles'}
           </Text>
@@ -744,7 +752,8 @@ const styles = StyleSheet.create({
   previewEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyCollIcon: { width: 56, height: 56, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
   collDetails: { padding: Spacing.md },
-  collName: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  collTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
+  collName: { fontSize: 14, fontWeight: '800' },
   collMetaRow: { flexDirection: 'row', alignItems: 'center' },
   collCount: { fontSize: 12, fontWeight: '600' },
   listContent: { paddingBottom: 100 },
