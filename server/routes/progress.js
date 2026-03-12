@@ -135,14 +135,16 @@ router.put('/:id/increment', auth, async (req, res) => {
         progress.currentChapter += 1;
         progress.lastReadDate = Date.now();
 
-        if (progress.status === 'Plan to Read') {
+        if (progress.status !== 'Reading') {
+            if (progress.status === 'Plan to Read') {
+                progress.startDate = Date.now();
+            }
             progress.status = 'Reading';
-            progress.startDate = Date.now();
         }
 
-        // Check if completed
+        // Check if completed - only if exactly at limit
         const story = await Story.findById(progress.story);
-        if (story.totalChapters && progress.currentChapter >= story.totalChapters) {
+        if (story.totalChapters && progress.currentChapter === story.totalChapters) {
             progress.status = 'Completed';
             progress.completedDate = Date.now();
         }
