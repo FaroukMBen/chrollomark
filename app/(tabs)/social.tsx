@@ -22,6 +22,7 @@ import { BorderRadius, Colors, Shadows, Spacing, StatusColors } from '@/constant
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
 import { useAuth } from '@/store/AuthContext';
+import { useSocket } from '@/store/SocketContext';
 import { useToast } from '@/store/ToastContext';
 
 const timeAgo = (date: string) => {
@@ -38,6 +39,7 @@ export default function SocialScreen() {
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
   const { showToast } = useToast();
+  const { socket } = useSocket();
 
   const [friends, setFriends] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
@@ -99,6 +101,32 @@ export default function SocialScreen() {
   }, [isAuthenticated]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Real-time social updates
+  useEffect(() => {
+    if (socket && isAuthenticated) {
+      const refreshSignals = [
+        'progress_update',
+        'review_update',
+        'collection_update',
+        'recommendation_update',
+        'friend_request_received',
+        'friend_request_accepted',
+        'user_updated'
+      ];
+
+      const handleUpdate = () => {
+        // Refresh the whole feed and friends list
+        loadData();
+      };
+
+      refreshSignals.forEach(signal => socket.on(signal, handleUpdate));
+
+      return () => {
+        refreshSignals.forEach(signal => socket.off(signal, handleUpdate));
+      };
+    }
+  }, [socket, isAuthenticated, loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);

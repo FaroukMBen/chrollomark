@@ -1,6 +1,7 @@
 const express = require('express');
 const Collection = require('../models/Collection');
 const auth = require('../middleware/auth');
+const { emitToFriends } = require('../socket');
 
 const router = express.Router();
 
@@ -20,6 +21,17 @@ router.post('/', auth, async (req, res) => {
         });
 
         await collection.save();
+        await collection.populate('user', 'username avatar');
+
+        if (collection.isPublic) {
+            emitToFriends(req.user._id, 'collection_update', {
+                collectionId: collection._id,
+                name: collection.name,
+                user: collection.user,
+                isNew: true
+            });
+        }
+
         res.status(201).json(collection);
     } catch (error) {
         if (error.name === 'ValidationError') {
@@ -88,6 +100,17 @@ router.put('/:id', auth, async (req, res) => {
         if (color) collection.color = color;
 
         await collection.save();
+        await collection.populate('user', 'username avatar');
+
+        if (collection.isPublic) {
+            emitToFriends(req.user._id, 'collection_update', {
+                collectionId: collection._id,
+                name: collection.name,
+                user: collection.user,
+                isNew: false
+            });
+        }
+
         res.json(collection);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });

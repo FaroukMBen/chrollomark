@@ -129,6 +129,13 @@ router.put('/profile', [auth, upload.single('avatar')], async (req, res) => {
             runValidators: true,
         }).select('-password');
 
+        // Emit update to friends so they see new username/avatar in real-time
+        emitToFriends(req.user._id, 'user_updated', {
+            userId: user._id,
+            username: user.username,
+            avatar: user.avatar
+        });
+
         res.json(user);
     } catch (error) {
         if (error.name === 'ValidationError') {

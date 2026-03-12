@@ -2,6 +2,7 @@ const express = require('express');
 const Review = require('../models/Review');
 const Story = require('../models/Story');
 const auth = require('../middleware/auth');
+const { emitToFriends } = require('../socket');
 
 const router = express.Router();
 
@@ -45,6 +46,18 @@ router.post('/', auth, async (req, res) => {
         await story.save();
 
         await review.populate('user', 'username avatar');
+        await review.populate('story', 'title type');
+
+        // Broadcast to friends for their social feed
+        emitToFriends(req.user._id, 'review_update', {
+            reviewId: review._id,
+            user: review.user,
+            story: review.story,
+            rating: review.rating,
+            title: review.title,
+            text: review.text,
+            isNew: !req.body.reviewId // Simplified indicator
+        });
 
         res.status(201).json(review);
     } catch (error) {

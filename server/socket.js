@@ -51,8 +51,21 @@ const emitToFriends = async (userId, event, data) => {
     }
 };
 
+// Helper to emit events specifically to a single user
+const emitToUser = (userId, event, data) => {
+    try {
+        if (io && userId) {
+            io.to(userId.toString()).emit(event, data);
+        }
+    } catch (error) {
+        console.error('Socket emitToUser error:', error);
+    }
+};
+
 module.exports = {
     init,
     getIO,
-    emitToFriends
+    emitToFriends,
+    emitToUser
 };
+

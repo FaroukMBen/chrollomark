@@ -5,6 +5,7 @@ const ReadingProgress = require('../models/ReadingProgress');
 const Review = require('../models/Review');
 const Recommendation = require('../models/Recommendation');
 const auth = require('../middleware/auth');
+const { emitToUser, emitToFriends } = require('../socket');
 
 const router = express.Router();
 
@@ -69,6 +70,12 @@ router.post('/friend-request', auth, async (req, res) => {
         await request.save();
         await request.populate('to', 'username avatar');
 
+        // Emit targeted notification
+        emitToUser(userId, 'friend_request_received', {
+            requestId: request._id,
+            from: { _id: req.user._id, username: req.user.username }
+        });
+
         res.status(201).json(request);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -131,6 +138,12 @@ router.put('/friend-request/:id', auth, async (req, res) => {
             });
             await User.findByIdAndUpdate(request.to, {
                 $addToSet: { friends: request.from },
+            });
+
+            // Emit notification to sender that request was accepted
+            emitToUser(request.from, 'friend_request_accepted', {
+                requestId: request._id,
+                acceptorId: request.to
             });
         } else {
             request.status = 'declined';
@@ -436,6 +449,18 @@ router.post('/recommend', auth, async (req, res) => {
                 message: message || '',
             });
             await recommendation.save();
+            await recommendation.populate('user', 'username avatar');
+            await recommendation.populate('story', 'title coverImage type');
+
+            // Emit to friends
+            emitToFriends(req.user._id, 'recommendation_update', {
+                recommendationId: recommendation._id,
+                user: recommendation.user,
+                story: recommendation.story,
+                message: recommendation.message,
+                timestamp: recommendation.createdAt
+            });
+
             res.json({ message: 'Story recommended to friends!', isRecommended: true });
         }
     } catch (error) {

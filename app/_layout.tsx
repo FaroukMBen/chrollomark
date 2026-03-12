@@ -6,14 +6,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/store/AuthContext';
+import { SocketProvider, useSocket } from '@/store/SocketContext';
 import { ThemeProvider } from '@/store/ThemeContext';
-import { ToastProvider } from '@/store/ToastContext';
-import { SocketProvider } from '@/store/SocketContext';
+import { ToastProvider, useToast } from '@/store/ToastContext';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 
 const ChrolloDark = {
+
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
@@ -43,6 +44,74 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+function GlobalSocketListener() {
+  const { socket } = useSocket();
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (!socket) return;
+    
+    const onFriendRequest = (data: any) => {
+      showToast({ message: `New friend request from ${data.from?.username}`, type: 'info' });
+    };
+
+    const onFriendAccept = (data: any) => {
+      showToast({ message: `Your friend request was accepted!`, type: 'success' });
+    };
+
+    const onProgressUpdate = (update: any) => {
+      // Show toast if someone moves to a new chapter
+      showToast({ 
+        message: `${update.username} is now on chapter ${update.currentChapter} of ${update.story?.title || 'a story'}`,
+        type: 'info' 
+      });
+    };
+
+    const onReviewUpdate = (data: any) => {
+      if (data.isNew) {
+        showToast({ 
+          message: `${data.user?.username} posted a new review for ${data.story?.title}`,
+          type: 'info' 
+        });
+      }
+    };
+
+    const onCollectionUpdate = (data: any) => {
+      if (data.isNew) {
+        showToast({ 
+          message: `${data.user?.username} created a new collection: ${data.name}`,
+          type: 'info' 
+        });
+      }
+    };
+
+    const onRecommendationUpdate = (data: any) => {
+      showToast({ 
+        message: `${data.user?.username} recommended ${data.story?.title}!`,
+        type: 'success' 
+      });
+    };
+
+    socket.on('friend_request_received', onFriendRequest);
+    socket.on('friend_request_accepted', onFriendAccept);
+    socket.on('progress_update', onProgressUpdate);
+    socket.on('review_update', onReviewUpdate);
+    socket.on('collection_update', onCollectionUpdate);
+    socket.on('recommendation_update', onRecommendationUpdate);
+
+    return () => {
+      socket.off('friend_request_received', onFriendRequest);
+      socket.off('friend_request_accepted', onFriendAccept);
+      socket.off('progress_update', onProgressUpdate);
+      socket.off('review_update', onReviewUpdate);
+      socket.off('collection_update', onCollectionUpdate);
+      socket.off('recommendation_update', onRecommendationUpdate);
+    };
+  }, [socket, showToast]);
+
+  return null;
+}
+
 function RootLayoutInner() {
   const colorScheme = useColorScheme();
   
@@ -53,6 +122,7 @@ function RootLayoutInner() {
     <NavThemeProvider value={theme}>
       <View style={{ flex: 1, backgroundColor: bgColor }}>
         <ToastProvider>
+          <GlobalSocketListener />
           <Stack screenOptions={{ 
             headerShown: false,
             contentStyle: { backgroundColor: bgColor },
