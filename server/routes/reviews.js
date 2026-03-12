@@ -34,16 +34,13 @@ router.post('/', auth, async (req, res) => {
                 spoiler,
             });
             story.totalReviews += 1;
+            story.popularityScore += 3;
         }
 
         await review.save();
 
-        // Recalculate average rating
-        const allReviews = await Review.find({ story: storyId });
-        const avgRating =
-            allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
-        story.averageRating = Math.round(avgRating * 10) / 10;
-        await story.save();
+        // Calculate popularity (centralized)
+        await story.calculatePopularity();
 
         await review.populate('user', 'username avatar');
         await review.populate('story', 'title type');
@@ -121,18 +118,8 @@ router.delete('/:id', auth, async (req, res) => {
         const storyId = review.story;
         await review.deleteOne();
 
-        // Recalculate average rating
-        const allReviews = await Review.find({ story: storyId });
-        const story = await Story.findById(storyId);
-        if (allReviews.length > 0) {
-            const avgRating =
-                allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
-            story.averageRating = Math.round(avgRating * 10) / 10;
-        } else {
-            story.averageRating = 0;
-        }
-        story.totalReviews = allReviews.length;
-        await story.save();
+        // Calculate popularity (centralized)
+        await story.calculatePopularity();
 
         res.json({ message: 'Review deleted' });
     } catch (error) {

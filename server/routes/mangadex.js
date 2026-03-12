@@ -95,9 +95,10 @@ router.get('/manga', auth, async (req, res) => {
         url.searchParams.append('includes[]', 'cover_art');
         url.searchParams.append('includes[]', 'author');
 
-        // Order
-        if (order) {
-            url.searchParams.append(`order[${order}]`, orderDir);
+        // Order mapping
+        const mdOrder = order === 'popularity' ? 'followedCount' : order;
+        if (mdOrder) {
+            url.searchParams.append(`order[${mdOrder}]`, orderDir);
         }
 
         // Content rating (default: safe + suggestive)

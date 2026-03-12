@@ -48,6 +48,25 @@ router.post('/', [auth, upload.single('coverImage')], async (req, res) => {
     }
 });
 
+// @route   POST /api/stories/sync-popularity
+// @desc    Recalculate popularity for all stories (Utility/Admin only)
+router.post('/sync-popularity', auth, async (req, res) => {
+    try {
+        const stories = await Story.find({});
+        const results = [];
+
+        for (const story of stories) {
+            await story.calculatePopularity();
+            results.push({ id: story._id, title: story.title, score: story.popularityScore });
+        }
+
+        res.json({ message: `Synced ${stories.length} stories`, results });
+    } catch (error) {
+        console.error('Sync Error:', error);
+        res.status(500).json({ message: 'Sync failed' });
+    }
+});
+
 // @route   GET /api/stories
 // @desc    Get all stories (with pagination, search, filters)
 router.get('/', auth, async (req, res) => {
@@ -68,8 +87,9 @@ router.get('/', auth, async (req, res) => {
             query.contentRating = { $in: contentRating.split(',') };
         }
 
+        const sortOption = sort === 'popularity' ? '-popularityScore' : sort;
         const stories = await Story.find(query)
-            .sort(sort)
+            .sort(sortOption)
             .limit(parseInt(limit))
             .skip((parseInt(page) - 1) * parseInt(limit))
             .populate('addedBy', 'username avatar');
@@ -97,9 +117,16 @@ router.get('/:id', auth, async (req, res) => {
             return res.status(404).json({ message: 'Story not found' });
         }
 
-        // Increment views
-        story.views += 1;
-        await story.save();
+        // Increment views and popularity score (2 pts per view) - ONLY ONCE PER USER
+        const userId = req.user._id.toString();
+        const hasViewed = story.viewedBy?.some(id => id.toString() === userId);
+
+        if (!hasViewed) {
+            story.views += 1;
+            if (!story.viewedBy) story.viewedBy = [];
+            story.viewedBy.push(req.user._id);
+            await story.calculatePopularity();
+        }
 
         // Get user's progress for this story
         const progress = await ReadingProgress.findOne({
@@ -207,7 +234,7 @@ router.post('/:id/like', auth, async (req, res) => {
             }
         }
 
-        await story.save();
+        await story.calculatePopularity();
         res.json({ isLiked: !isLiked, isDisliked: false, likesCount: story.likes.length, dislikesCount: story.dislikes.length });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -235,7 +262,7 @@ router.post('/:id/dislike', auth, async (req, res) => {
             }
         }
 
-        await story.save();
+        await story.calculatePopularity();
         res.json({ isLiked: false, isDisliked: !isDisliked, likesCount: story.likes.length, dislikesCount: story.dislikes.length });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });

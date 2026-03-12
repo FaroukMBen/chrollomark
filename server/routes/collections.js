@@ -1,5 +1,6 @@
 const express = require('express');
 const Collection = require('../models/Collection');
+const Story = require('../models/Story');
 const auth = require('../middleware/auth');
 const { emitToFriends } = require('../socket');
 
@@ -135,6 +136,11 @@ router.put('/:id/stories', auth, async (req, res) => {
 
         collection.stories.push(storyId);
         await collection.save();
+
+        // Popularity: Centralized recalculation
+        const story = await Story.findById(storyId);
+        if (story) await story.calculatePopularity();
+
         await collection.populate('stories', 'title coverImage type');
 
         res.json(collection);
@@ -158,6 +164,10 @@ router.delete('/:id/stories/:storyId', auth, async (req, res) => {
             (s) => s.toString() !== req.params.storyId
         );
         await collection.save();
+
+        // Popularity: Centralized recalculation
+        const story = await Story.findById(req.params.storyId);
+        if (story) await story.calculatePopularity();
 
         res.json(collection);
     } catch (error) {

@@ -50,8 +50,8 @@ router.post('/', auth, async (req, res) => {
                 startDate: status === 'Reading' ? Date.now() : null,
             });
 
-            // Increment readers count
-            await Story.findByIdAndUpdate(storyId, { $inc: { totalReaders: 1 } });
+            // Increment readers count and popularity via centralized logic
+            await story.calculatePopularity();
         }
 
         await progress.save();
@@ -212,7 +212,8 @@ router.delete('/:storyId', auth, async (req, res) => {
 
         if (!progress) return res.status(404).json({ message: 'Progress not found' });
 
-        await Story.findByIdAndUpdate(req.params.storyId, { $inc: { totalReaders: -1 } });
+        const story = await Story.findById(req.params.storyId);
+        if (story) await story.calculatePopularity();
 
         res.json({ message: 'Removed from library' });
     } catch (error) {
@@ -273,7 +274,7 @@ router.put('/:storyId/favorite', auth, async (req, res) => {
                 status: 'Plan to Read',
                 isFavorite: true,
             });
-            await Story.findByIdAndUpdate(req.params.storyId, { $inc: { totalReaders: 1 } });
+            await story.calculatePopularity();
         } else {
             progress.isFavorite = !progress.isFavorite;
         }
