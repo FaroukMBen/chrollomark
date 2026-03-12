@@ -27,20 +27,30 @@ export default function HomeScreen() {
 
   const [stats, setStats] = useState<any>(null);
   const [currentlyReading, setCurrentlyReading] = useState<any[]>([]);
+  const [trendingStories, setTrendingStories] = useState<any[]>([]);
   const [recentlyUpdated, setRecentlyUpdated] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const [statsData, readingData, allProgressData] = await Promise.all([
+      const [statsData, readingData, allProgressData, trendingData] = await Promise.all([
         api.getProgressStats(),
         api.getMyProgress({ status: 'Reading' }),
         api.getMyProgress({}),
+        api.getStories({ sort: 'popularity', limit: '10' }),
       ]);
       setStats(statsData);
       setCurrentlyReading(readingData.slice(0, 8));
+      setTrendingStories(trendingData.stories);
       // Show recently completed or updated
       const sorted = allProgressData
         .filter((p: any) => p.status !== 'Reading')
@@ -113,46 +123,159 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={styles.scrollContent}>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.greeting, { color: colors.textSecondary }]}>Welcome back,</Text>
-            <Text style={[styles.username, { color: colors.text }]}>{user?.username}</Text>
+        {/* Header & Hero */}
+        <View style={styles.heroSection}>
+          <View style={styles.header}>
+            <View>
+              <Text style={[styles.greeting, { color: colors.textSecondary }]}>{getGreeting()},</Text>
+              <Text style={[styles.username, { color: colors.text }]}>{user?.username}</Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.profileButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+              onPress={() => router.push('/(tabs)/profile')}>
+              <Image 
+                source={user?.avatar ? { uri: user.avatar } : undefined} 
+                style={styles.avatarMini}
+                contentFit="cover"
+              />
+            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Stats Cards */}
-        {stats && (
-          <View style={styles.statsRow}>
-            {statCards.map((item) => (
-              <View
-                key={item.label}
-                style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                <View style={[styles.statIconBg, { backgroundColor: item.color + '15' }]}>
-                  <IconSymbol name={item.icon} size={16} color={item.color} />
+          {/* Featured/Most Recent Reading Card */}
+          {currentlyReading.length > 0 ? (
+            <TouchableOpacity 
+              style={[styles.heroCard, { backgroundColor: colors.surface }]}
+              onPress={() => router.push(`/story/${currentlyReading[0].story._id}` as any)}
+              activeOpacity={0.9}>
+              <Image 
+                source={{ uri: currentlyReading[0].story.coverImage }} 
+                style={styles.heroBackground} 
+                contentFit="cover" 
+              />
+              <LinearGradient 
+                colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']} 
+                style={styles.heroGradient} 
+              />
+              <View style={styles.heroContent}>
+                <View style={[styles.heroBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.heroBadgeText}>CONTINUE READING</Text>
                 </View>
-                <Text style={[styles.statNumber, { color: item.color }]}>{item.value}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                <Text style={styles.heroTitle} numberOfLines={2}>{currentlyReading[0].story.title}</Text>
+                <View style={styles.heroMeta}>
+                  <Text style={styles.heroChapter}>Chapter {currentlyReading[0].currentChapter}</Text>
+                  <View style={styles.dot} />
+                  <Text style={styles.heroSubText}>{currentlyReading[0].story.type}</Text>
+                </View>
+                {currentlyReading[0].story.totalChapters > 0 && (
+                  <View style={styles.heroProgressContainer}>
+                    <View style={[styles.heroProgressBar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                      <View style={[styles.heroProgressFill, { 
+                        width: `${Math.round((currentlyReading[0].currentChapter / currentlyReading[0].story.totalChapters) * 100)}%`, 
+                        backgroundColor: colors.primary 
+                      }]} />
+                    </View>
+                  </View>
+                )}
               </View>
-            ))}
-          </View>
-        )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.heroCard, { backgroundColor: colors.primary + '20' }]}
+              onPress={() => router.push('/(tabs)/explore')}
+              activeOpacity={0.9}>
+              <LinearGradient 
+                colors={[colors.primary + '40', colors.primary + '10']} 
+                style={styles.heroBackground} 
+              />
+              <View style={[styles.heroContent, { alignItems: 'center', justifyContent: 'center' }]}>
+                <View style={[styles.heroBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.heroBadgeText}>DISCOVER</Text>
+                </View>
+                <Text style={[styles.heroTitle, { textAlign: 'center' }]}>Find your next favorite story</Text>
+                <Text style={[styles.heroSubText, { color: colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
+                  Explore thousands of manga, webtoons and comics.
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* Stats Summary - New Robust Grid */}
+          {stats && (
+            <View style={styles.statsGrid}>
+              {statCards.map((item) => (
+                <View
+                  key={item.label}
+                  style={[styles.statGridCard, { backgroundColor: colors.surface + '80', borderColor: colors.cardBorder }]}>
+                  <View style={[styles.statIconContainer, { backgroundColor: item.color + '15' }]}>
+                    <IconSymbol name={item.icon} size={16} color={item.color} />
+                  </View>
+                  <View style={styles.statInfo}>
+                    <Text style={[styles.statValue, { color: colors.text }]}>{item.value}</Text>
+                    <Text style={[styles.statLabel, { color: colors.textSecondary }]} numberOfLines={1}>{item.label}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={[styles.quickActionBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             onPress={() => router.push('/(tabs)/explore')}>
-            <IconSymbol name="globe" size={20} color={colors.primary} />
-            <Text style={[styles.quickActionText, { color: colors.text }]}>Browse MangaDex</Text>
+            <View style={[styles.quickActionCircle, { backgroundColor: colors.primary + '15' }]}>
+              <IconSymbol name="globe" size={16} color={colors.primary} />
+            </View>
+            <Text style={[styles.quickActionText, { color: colors.text }]}>Discover</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickActionBtn, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
             onPress={() => router.push('/(tabs)/social')}>
-            <IconSymbol name="person.2.fill" size={20} color={colors.primary} />
+            <View style={[styles.quickActionCircle, { backgroundColor: colors.primary + '15' }]}>
+              <IconSymbol name="person.2.fill" size={16} color={colors.primary} />
+            </View>
             <Text style={[styles.quickActionText, { color: colors.text }]}>Friends</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Trending on Chrollomark */}
+        {trendingStories.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <IconSymbol name="flame.fill" size={18} color="#FF6B6B" />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Trending Now</Text>
+              </View>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/explore')}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>Explore</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {trendingStories.map((story) => (
+                <TouchableOpacity
+                  key={story._id}
+                  style={styles.trendingCard}
+                  onPress={() => router.push(`/story/${story._id}` as any)}
+                  activeOpacity={0.8}>
+                  <View style={styles.trendingCoverContainer}>
+                    <Image source={{ uri: story.coverImage }} style={styles.trendingCover} contentFit="cover" />
+                    <View style={[styles.popularityBadge, { backgroundColor: colors.surface + 'E6' }]}>
+                      <IconSymbol name="plus.circle.fill" size={10} color={colors.primary} />
+                      <Text style={[styles.popularityText, { color: colors.text }]}>{Math.round(story.popularityScore)}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.trendingTitle, { color: colors.text }]} numberOfLines={2}>
+                    {story.title}
+                  </Text>
+                  <Text style={[styles.trendingSub, { color: colors.textSecondary }]}>
+                    {story.genres?.[0] || story.type}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Currently Reading */}
         <View style={styles.section}>
@@ -162,7 +285,7 @@ export default function HomeScreen() {
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Currently Reading</Text>
             </View>
             <TouchableOpacity onPress={() => router.push('/(tabs)/library')}>
-              <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
+              <Text style={[styles.seeAll, { color: colors.primary }]}>Go to Library</Text>
             </TouchableOpacity>
           </View>
 
@@ -170,11 +293,11 @@ export default function HomeScreen() {
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <IconSymbol name="books.vertical.fill" size={32} color={colors.textSecondary} />
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                No stories being read yet.{'\n'}Find your first story in Explore!
+                Your reading list is empty.{'\n'}Find something great to read!
               </Text>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
               {currentlyReading.map((progress) => {
                 const pct = progress.story.totalChapters > 0
                   ? Math.round((progress.currentChapter / progress.story.totalChapters) * 100)
@@ -184,46 +307,35 @@ export default function HomeScreen() {
                     key={progress._id}
                     style={[styles.storyCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
                     onPress={() => router.push(`/story/${progress.story._id}` as any)}
-                    activeOpacity={0.7}>
-                    {progress.story.coverImage ? (
-                      <View>
-                        <Image source={{ uri: progress.story.coverImage }} style={styles.storyCover} contentFit="cover" />
-                        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.coverOverlay} />
-                      </View>
-                    ) : (
-                      <View style={[styles.storyCover, styles.placeholderCover, { backgroundColor: colors.surfaceElevated }]}>
-                        <IconSymbol name="book.fill" size={32} color={colors.textSecondary} />
-                      </View>
-                    )}
+                    activeOpacity={0.8}>
+                    <View>
+                      <Image source={{ uri: progress.story.coverImage }} style={styles.storyCover} contentFit="cover" />
+                      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.coverOverlay} />
+                      <TouchableOpacity
+                        style={[styles.incrementAction, { backgroundColor: colors.primary }]}
+                        onPress={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const updated = await api.incrementChapter(progress._id);
+                            setCurrentlyReading((prev) => prev.map((p) => (p._id === progress._id ? updated : p)));
+                          } catch (err) { console.log(err); }
+                        }}>
+                        <IconSymbol name="plus" size={14} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
                     <View style={styles.storyMeta}>
-                      <Text style={[styles.storyTitle, { color: colors.text }]} numberOfLines={2}>
+                      <Text style={[styles.storyTitle, { color: colors.text }]} numberOfLines={1}>
                         {progress.story.title}
                       </Text>
-                      <View style={styles.progressRow}>
-                        <Text style={[styles.chapterText, { color: colors.primary }]}>
-                          Ch. {progress.currentChapter}
-                          {progress.story.totalChapters ? ` / ${progress.story.totalChapters}` : ''}
-                        </Text>
-                      </View>
+                      <Text style={[styles.chapterText, { color: colors.textSecondary }]}>
+                        Ch. {progress.currentChapter} / {progress.story.totalChapters || '??'}
+                      </Text>
                       {pct > 0 && (
-                        <View style={[styles.progressBar, { backgroundColor: colors.surfaceElevated }]}>
-                          <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: colors.primary }]} />
+                        <View style={[styles.miniProgressBar, { backgroundColor: colors.surfaceElevated }]}>
+                          <View style={[styles.miniProgressFill, { width: `${pct}%`, backgroundColor: colors.primary }]} />
                         </View>
                       )}
                     </View>
-                    <TouchableOpacity
-                      style={[styles.incrementButton, { backgroundColor: colors.primary }]}
-                      onPress={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          const updated = await api.incrementChapter(progress._id);
-                          setCurrentlyReading((prev) => prev.map((p) => (p._id === progress._id ? updated : p)));
-                        } catch (err) { console.log(err); }
-                      }}
-                      activeOpacity={0.8}>
-                      <IconSymbol name="plus" size={14} color="#FFF" />
-                      <Text style={styles.incrementText}>Chapter</Text>
-                    </TouchableOpacity>
                   </TouchableOpacity>
                 );
               })}
@@ -234,32 +346,36 @@ export default function HomeScreen() {
         {/* Recently Updated */}
         {recentlyUpdated.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <IconSymbol name="clock.fill" size={18} color={colors.textSecondary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <IconSymbol name="clock.fill" size={18} color={colors.textSecondary} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+              </View>
             </View>
-            {recentlyUpdated.map((item) => (
-              <TouchableOpacity
-                key={item._id}
-                style={[styles.activityItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-                onPress={() => router.push(`/story/${item.story?._id}` as any)}>
-                <View style={[styles.statusIndicator, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
-                <View style={styles.activityInfo}>
-                  <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
-                    {item.story?.title}
-                  </Text>
-                  <View style={styles.activityMeta}>
-                    <View style={[styles.statusPill, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
-                      <Text style={[styles.statusPillText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
-                    </View>
-                    <Text style={[styles.activityChapter, { color: colors.textSecondary }]}>
-                      Ch. {item.currentChapter}{item.story?.totalChapters ? ` / ${item.story.totalChapters}` : ''}
+            <View style={{ marginTop: Spacing.xs }}>
+              {recentlyUpdated.map((item) => (
+                <TouchableOpacity
+                  key={item._id}
+                  style={[styles.activityItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+                  onPress={() => router.push(`/story/${item.story?._id}` as any)}>
+                  <View style={[styles.statusIndicator, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
+                  <View style={styles.activityInfo}>
+                    <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
+                      {item.story?.title}
                     </Text>
+                    <View style={styles.activityMeta}>
+                      <View style={[styles.statusPill, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
+                        <Text style={[styles.statusPillText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
+                      </View>
+                      <Text style={[styles.activityChapter, { color: colors.textSecondary }]}>
+                        Ch. {item.currentChapter}{item.story?.totalChapters ? ` / ${item.story.totalChapters}` : ''}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+                  <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
               </TouchableOpacity>
-            ))}
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -269,163 +385,169 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingBottom: 32 },
+  scrollContent: { paddingBottom: 40 },
+  heroSection: {
+    paddingBottom: Spacing.lg,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.lg,
   },
-  greeting: { fontSize: 14, marginBottom: 2, fontWeight: '500' },
-  username: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  addButton: {
-    width: 46,
-    height: 46,
-    borderRadius: BorderRadius.full,
+  greeting: { fontSize: 13, marginBottom: 2, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  username: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.glow,
   },
-  statsRow: {
+  avatarMini: { width: '100%', height: '100%' },
+  
+  heroCard: {
+    marginHorizontal: Spacing.lg,
+    height: 220,
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    ...Shadows.lg,
+  },
+  heroBackground: { width: '100%', height: '100%', position: 'absolute' },
+  heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '100%' },
+  heroContent: { flex: 1, justifyContent: 'flex-end', padding: Spacing.lg },
+  heroBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.sm,
+    marginBottom: 8,
+  },
+  heroBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  heroTitle: { fontSize: 22, fontWeight: '800', color: '#FFF', marginBottom: 6, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  heroChapter: { color: '#FFF', fontSize: 14, fontWeight: '700', opacity: 0.9 },
+  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFF', opacity: 0.5 },
+  heroSubText: { color: '#FFF', fontSize: 14, fontWeight: '500', opacity: 0.8 },
+  heroProgressContainer: { width: '100%', marginTop: 4 },
+  heroProgressBar: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  heroProgressFill: { height: '100%', borderRadius: 2 },
+
+  statsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
+    justifyContent: 'space-between',
     marginTop: Spacing.md,
   },
-  statCard: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
-    borderRadius: BorderRadius.md,
+  statGridCard: {
+    width: '48.5%',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    gap: 3,
+    marginBottom: Spacing.sm,
   },
-  statIconBg: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  statNumber: { fontSize: 20, fontWeight: '800' },
-  statLabel: { fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statInfo: { flex: 1 },
+  statValue: { fontSize: 18, fontWeight: '800', lineHeight: 22 },
+  statLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.6, marginTop: 1 },
+
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
     gap: Spacing.sm,
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
   },
   quickActionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
+    padding: 12,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
+    gap: 10,
   },
-  quickActionText: { fontSize: 13, fontWeight: '600' },
-  section: { marginTop: Spacing.lg, paddingHorizontal: Spacing.lg },
+  quickActionCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickActionText: { fontSize: 13, fontWeight: '700' },
+
+  section: { marginTop: Spacing.xl },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.md },
-  sectionTitle: { fontSize: 17, fontWeight: '700' },
-  seeAll: { fontSize: 13, fontWeight: '600' },
-  storyCard: {
-    width: 150,
-    marginRight: Spacing.md,
-    borderRadius: BorderRadius.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
-  storyCover: { width: '100%', height: 190 },
-  coverOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 },
-  placeholderCover: { justifyContent: 'center', alignItems: 'center' },
-  storyMeta: { padding: Spacing.sm },
-  storyTitle: { fontSize: 12, fontWeight: '700', marginBottom: 4, lineHeight: 16 },
-  progressRow: { flexDirection: 'row', alignItems: 'center' },
-  chapterText: { fontSize: 11, fontWeight: '700' },
-  progressBar: { height: 3, borderRadius: 2, marginTop: 6, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 2 },
-  incrementButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.sm,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.sm,
   },
-  incrementText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3 },
+  seeAll: { fontSize: 13, fontWeight: '700' },
+  horizontalScroll: { paddingLeft: Spacing.lg, paddingRight: Spacing.sm, paddingBottom: 4 },
+
+  trendingCard: { width: 130, marginRight: Spacing.md },
+  trendingCoverContainer: { width: 130, height: 180, borderRadius: BorderRadius.lg, overflow: 'hidden', marginBottom: 8, ...Shadows.sm },
+  trendingCover: { width: '100%', height: '100%' },
+  popularityBadge: { position: 'absolute', top: 6, right: 6, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 3, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  popularityText: { fontSize: 10, fontWeight: '800' },
+  trendingTitle: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  trendingSub: { fontSize: 11, fontWeight: '600', opacity: 0.8 },
+
+  storyCard: { width: 160, marginRight: Spacing.md, borderRadius: BorderRadius.xl, overflow: 'hidden', borderWidth: 1, ...Shadows.sm },
+  storyCover: { width: '100%', height: 120 },
+  coverOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 40 },
+  storyMeta: { padding: 12 },
+  storyTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  chapterText: { fontSize: 12, fontWeight: '600' },
+  miniProgressBar: { height: 3, borderRadius: 2, marginTop: 10, overflow: 'hidden' },
+  miniProgressFill: { height: '100%', borderRadius: 2 },
+  incrementAction: { position: 'absolute', bottom: 8, right: 8, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', ...Shadows.sm },
+
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    marginHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.xl,
     marginBottom: Spacing.sm,
     borderWidth: 1,
     gap: Spacing.md,
   },
   statusIndicator: { width: 4, height: 36, borderRadius: 2 },
   activityInfo: { flex: 1 },
-  activityTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  activityTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   activityMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.full },
-  statusPillText: { fontSize: 10, fontWeight: '700' },
+  statusPillText: { fontSize: 11, fontWeight: '700' },
   activityChapter: { fontSize: 12, fontWeight: '600' },
-  emptyCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    gap: Spacing.sm,
-  },
-  emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  emptyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.sm,
-    ...Shadows.sm,
-  },
-  emptyButtonText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
-  welcomeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  logoBg: {
-    width: 100,
-    height: 100,
-    borderRadius: BorderRadius.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
+
+  emptyCard: { marginHorizontal: Spacing.lg, padding: Spacing.xl, borderRadius: BorderRadius.xl, alignItems: 'center', borderWidth: 1, borderStyle: 'dashed', gap: Spacing.sm },
+  emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22, fontWeight: '500' },
+  
+  welcomeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  logoBg: { width: 100, height: 100, borderRadius: BorderRadius.xl, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.lg },
   appName: { fontSize: 36, fontWeight: '800', letterSpacing: -1, marginBottom: Spacing.sm },
   tagline: { fontSize: 16, textAlign: 'center', marginBottom: Spacing.xl, lineHeight: 24 },
-  authButton: {
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    ...Shadows.glow,
-  },
+  authButton: { width: '100%', paddingVertical: 16, borderRadius: BorderRadius.lg, alignItems: 'center', marginBottom: Spacing.md, ...Shadows.glow },
   authButtonText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
-  authButtonOutline: {
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    borderWidth: 2,
-  },
+  authButtonOutline: { width: '100%', paddingVertical: 16, borderRadius: BorderRadius.lg, alignItems: 'center', borderWidth: 2 },
   authButtonOutlineText: { fontSize: 16, fontWeight: '700' },
 });

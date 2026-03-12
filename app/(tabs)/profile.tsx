@@ -45,7 +45,6 @@ export default function ProfileScreen() {
   const { themeMode, setThemeMode } = useTheme();
 
   const [stats, setStats] = useState<any>(null);
-  const [collections, setCollections] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const { showToast } = useToast();
@@ -72,12 +71,8 @@ export default function ProfileScreen() {
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const [statsData, collectionsData] = await Promise.all([
-        api.getProgressStats(),
-        api.getMyCollections(),
-      ]);
+      const statsData = await api.getProgressStats();
       setStats(statsData);
-      setCollections(collectionsData);
     } catch (error) {
       console.log('Error:', error);
     }
@@ -423,44 +418,6 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* ─── COLLECTIONS ─── */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <IconSymbol name="folder.fill" size={16} color={colors.primary} />
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>My Collections</Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.newCollectionBtn, { backgroundColor: colors.primary + '15' }]}
-              onPress={() => router.push('/collection/create')}>
-              <IconSymbol name="plus" size={12} color={colors.primary} />
-              <Text style={[styles.newCollectionText, { color: colors.primary }]}>New</Text>
-            </TouchableOpacity>
-          </View>
-
-          {collections.length === 0 ? (
-            <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <IconSymbol name="folder" size={28} color={colors.textSecondary} />
-              <Text style={[styles.emptyCardText, { color: colors.textSecondary }]}>No collections yet</Text>
-            </View>
-          ) : (
-            collections.map((collection) => (
-              <TouchableOpacity
-                key={collection._id}
-                style={[styles.collectionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-                onPress={() => router.push(`/collection/${collection._id}` as any)}>
-                <View style={[styles.collectionColor, { backgroundColor: collection.color || colors.primary }]} />
-                <View style={styles.collectionInfo}>
-                  <Text style={[styles.collectionName, { color: colors.text }]}>{collection.name}</Text>
-                  <Text style={[styles.collectionCount, { color: colors.textSecondary }]}>
-                    {collection.stories.length} stories{collection.isPublic ? ' · Public' : ''}
-                  </Text>
-                </View>
-                <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
 
         {/* ─── DEVELOPER HUB ─── */}
         <View style={styles.section}>
@@ -767,19 +724,6 @@ const styles = StyleSheet.create({
   },
   newCollectionText: { fontSize: 11, fontWeight: '700' },
 
-  // Collection Cards
-  collectionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    borderWidth: 1,
-  },
-  collectionColor: { width: 4, height: 28, borderRadius: 2, marginRight: Spacing.md },
-  collectionInfo: { flex: 1 },
-  collectionName: { fontSize: 14, fontWeight: '700' },
-  collectionCount: { fontSize: 11, marginTop: 2, fontWeight: '500' },
 
   // Empty
   emptyCard: {
