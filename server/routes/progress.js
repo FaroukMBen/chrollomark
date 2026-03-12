@@ -2,6 +2,7 @@ const express = require('express');
 const ReadingProgress = require('../models/ReadingProgress');
 const Story = require('../models/Story');
 const auth = require('../middleware/auth');
+const { emitToFriends } = require('../socket');
 
 const router = express.Router();
 
@@ -55,6 +56,15 @@ router.post('/', auth, async (req, res) => {
 
         await progress.save();
         await progress.populate('story', 'title coverImage type totalChapters');
+
+        // Emit socket update to friends
+        emitToFriends(req.user._id, 'progress_update', {
+            userId: req.user._id,
+            username: req.user.username,
+            story: progress.story,
+            currentChapter: progress.currentChapter,
+            status: progress.status
+        });
 
         res.json(progress);
     } catch (error) {
@@ -140,6 +150,15 @@ router.put('/:id/increment', auth, async (req, res) => {
         await progress.save();
         await progress.populate('story', 'title coverImage type totalChapters');
 
+        // Emit socket update to friends
+        emitToFriends(req.user._id, 'progress_update', {
+            userId: req.user._id,
+            username: req.user.username,
+            story: progress.story,
+            currentChapter: progress.currentChapter,
+            status: progress.status
+        });
+
         res.json(progress);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -164,6 +183,16 @@ router.put('/:id/decrement', auth, async (req, res) => {
         }
 
         await progress.populate('story', 'title coverImage type totalChapters');
+
+        // Emit socket update to friends
+        emitToFriends(req.user._id, 'progress_update', {
+            userId: req.user._id,
+            username: req.user.username,
+            story: progress.story,
+            currentChapter: progress.currentChapter,
+            status: progress.status
+        });
+
         res.json(progress);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });

@@ -17,7 +17,14 @@ const supportRoutes = require('./routes/support');
 const devlogRoutes = require('./routes/devlog');
 const imageRoutes = require('./routes/images');
 
+const http = require('http');
+const socketManager = require('./socket');
+
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.io
+socketManager.init(server);
 
 // Middleware
 app.use(cors());
@@ -54,7 +61,7 @@ const PORT = process.env.PORT || 5000;
 
 // Connect to DB and start server
 connectDB().then(() => {
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
         console.log(`\nChrolloMark API Server running on port ${PORT}`);
         console.log(`http://localhost:${PORT}`);
         console.log(`Health check: http://localhost:${PORT}/api/health\n`);

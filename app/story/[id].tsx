@@ -20,6 +20,7 @@ import { BorderRadius, Colors, Shadows, Spacing, StatusColors } from '@/constant
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
 import { useAuth } from '@/store/AuthContext';
+import { useSocket } from '@/store/SocketContext';
 import { useToast } from '@/store/ToastContext';
 
 // MangaDex UUIDs contain dashes, MongoDB ObjectIds don't
@@ -32,6 +33,7 @@ export default function StoryDetailScreen() {
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
   const { showToast } = useToast();
+  const { socket } = useSocket();
 
   const [story, setStory] = useState<any>(null);
   const [progress, setProgress] = useState<any>(null);
@@ -124,6 +126,24 @@ export default function StoryDetailScreen() {
   }, [id]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Real-time progress updates from friends
+  useEffect(() => {
+    if (socket && story && !isMangaDex) {
+      const handleProgressUpdate = (update: any) => {
+        const updateStoryId = update.story?._id || update.story;
+        if (updateStoryId === story._id) {
+          // A friend updated their progress for this story, refresh silently
+          loadData();
+        }
+      };
+      
+      socket.on('progress_update', handleProgressUpdate);
+      return () => {
+        socket.off('progress_update', handleProgressUpdate);
+      };
+    }
+  }, [socket, story, isMangaDex, loadData]);
 
   // Clone from MangaDex to local DB, then reload as local story
   const handleCloneAndAdd = async () => {

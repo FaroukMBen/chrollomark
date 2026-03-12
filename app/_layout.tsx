@@ -8,6 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/store/AuthContext';
 import { ThemeProvider } from '@/store/ThemeContext';
 import { ToastProvider } from '@/store/ToastContext';
+import { SocketProvider } from '@/store/SocketContext';
 
 import { useMemo } from 'react';
 import { View } from 'react-native';
@@ -100,7 +101,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <RootLayoutInner />
+          <SocketProvider>
+            <RootLayoutInner />
+          </SocketProvider>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>

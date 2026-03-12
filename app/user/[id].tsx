@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, Spacing, StatusColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
+import { useSocket } from '@/store/SocketContext';
 import { useToast } from '@/store/ToastContext';
 
 export default function UserProfileScreen() {
@@ -24,6 +25,7 @@ export default function UserProfileScreen() {
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
   const { showToast } = useToast();
+  const { socket } = useSocket();
 
   const [profile, setProfile] = useState<any>(null);
   const [collections, setCollections] = useState<any[]>([]);
@@ -88,6 +90,23 @@ export default function UserProfileScreen() {
   };
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Listen for real-time progress updates from this user
+  useEffect(() => {
+    if (socket && id) {
+      const handleProgressUpdate = (update: any) => {
+        if (update.userId === id) {
+          // The user we are viewing updated their progress
+          loadData();
+        }
+      };
+
+      socket.on('progress_update', handleProgressUpdate);
+      return () => {
+        socket.off('progress_update', handleProgressUpdate);
+      };
+    }
+  }, [socket, id, loadData]);
 
   if (isLoading) {
     return (
