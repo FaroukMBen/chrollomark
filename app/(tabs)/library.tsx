@@ -31,6 +31,7 @@ export default function LibraryScreen() {
   const [activeSection, setActiveSection] = useState<'Stories' | 'Collections' | 'Favorites'>('Stories');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'compact'>('list');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
 
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -61,6 +62,38 @@ export default function LibraryScreen() {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
+  };
+
+  const sortedProgress = React.useMemo(() => {
+    if (!progress) return [];
+    const items = [...progress];
+    switch (sortBy) {
+      case 'az': 
+        return items.sort((a, b) => (a.story?.title || '').localeCompare(b.story?.title || ''));
+      case 'za': 
+        return items.sort((a, b) => (b.story?.title || '').localeCompare(a.story?.title || ''));
+      case 'newest': 
+        return items; // Default from API is usually newest
+      case 'oldest': 
+        return items.reverse();
+      default: 
+        return items;
+    }
+  }, [progress, sortBy]);
+
+  const toggleSort = () => {
+    const options: Array<'newest' | 'oldest' | 'az' | 'za'> = ['newest', 'oldest', 'az', 'za'];
+    const nextIndex = (options.indexOf(sortBy) + 1) % options.length;
+    setSortBy(options[nextIndex]);
+  };
+
+  const getSortIcon = () => {
+    switch (sortBy) {
+      case 'az': return 'textformat.abc';
+      case 'za': return 'textformat.abc';
+      case 'newest': return 'arrow.down';
+      case 'oldest': return 'arrow.up';
+    }
   };
 
   const getSectionIcon = (section: string) => {
@@ -305,7 +338,15 @@ export default function LibraryScreen() {
           ) : (
             <>
               <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{statusFilter === 'All' ? activeSection : statusFilter}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>{statusFilter === 'All' ? activeSection : statusFilter}</Text>
+                  <TouchableOpacity style={styles.sortBtn} onPress={toggleSort}>
+                    <IconSymbol name={getSortIcon() as any} size={14} color={colors.primary} />
+                    <Text style={[styles.sortText, { color: colors.primary }]}>
+                      {sortBy === 'az' ? 'A-Z' : sortBy === 'za' ? 'Z-A' : sortBy.charAt(0).toUpperCase() + sortBy.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 <View style={[styles.viewToggle, { backgroundColor: colors.surfaceElevated }]}>
                   {(['list', 'grid', 'compact'] as const).map(mode => (
                     <TouchableOpacity key={mode} onPress={() => setViewMode(mode)} style={[styles.toggleBtn, viewMode === mode && { backgroundColor: colors.primary }]}>
@@ -322,7 +363,7 @@ export default function LibraryScreen() {
                 </View>
               ) : (
                 <View style={viewMode !== 'list' && styles.gridContainer}>
-                  {progress.map(renderStoryItem)}
+                  {sortedProgress.map(renderStoryItem)}
                 </View>
               )}
             </>
@@ -404,4 +445,14 @@ const styles = StyleSheet.create({
   compactCover: { width: '100%', height: 140, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.1)' },
   compactTitle: { fontSize: 10, fontWeight: '600', marginTop: 4, textAlign: 'center' },
   compactFav: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(255,255,255,0.9)', width: 14, height: 14, borderRadius: 7, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
+  sortBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4,
+    backgroundColor: 'rgba(148, 163, 184, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+  },
+  sortText: { fontSize: 11, fontWeight: '700' },
 });

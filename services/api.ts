@@ -237,7 +237,7 @@ class ApiService {
     }
 
     async getStory(id: string) {
-        return this.request<{ story: any; userProgress: any; reviews: any[]; isRecommended: boolean }>(`/stories/${id}`);
+        return this.request<{ story: any; userProgress: any; friendsProgress: any[]; reviews: any[]; isRecommended: boolean }>(`/stories/${id}`);
     }
 
     async updateStory(id: string, data: any) {

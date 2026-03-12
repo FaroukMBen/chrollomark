@@ -117,9 +117,16 @@ router.get('/:id', auth, async (req, res) => {
             story: story._id,
         });
 
+        // Get friends' progress for this story
+        const friendsProgress = await ReadingProgress.find({
+            user: { $in: req.user.friends },
+            story: story._id,
+        }).populate('user', 'username avatar');
+
         res.json({
             story,
             userProgress: progress,
+            friendsProgress,
             reviews,
             isRecommended: !!isRecommended,
             likesCount: story.likes?.length || 0,

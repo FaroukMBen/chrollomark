@@ -37,6 +37,7 @@ export default function StoryDetailScreen() {
   const [progress, setProgress] = useState<any>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [collections, setCollections] = useState<any[]>([]);
+  const [friendsProgress, setFriendsProgress] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMangaDex, setIsMangaDex] = useState(false);
 
@@ -105,6 +106,7 @@ export default function StoryDetailScreen() {
         const data = await api.getStory(id);
         setStory(data.story);
         setProgress(data.userProgress);
+        setFriendsProgress(data.friendsProgress || []);
         setDisplayedChapter(data.userProgress?.currentChapter || 0);
         setEditChapter(String(data.userProgress?.currentChapter || 0));
         setReviews(data.reviews);
@@ -717,6 +719,52 @@ export default function StoryDetailScreen() {
                 </View>
               </View>
             )}
+          </View>
+        )}
+
+        {/* Friends' Progress Section — Comparison Mode */}
+        {!isMangaDex && friendsProgress.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <IconSymbol name="person.2.fill" size={18} color={colors.text} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Friends Progress</Text>
+              </View>
+            </View>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendsProgressScroll}>
+              {friendsProgress.map((fp) => {
+                const diff = (fp.currentChapter || 0) - (progress?.currentChapter || 0);
+                return (
+                  <View key={fp._id} style={[styles.friendProgressCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                    {fp.user?.avatar ? (
+                      <Image source={{ uri: fp.user.avatar }} style={styles.friendAvatar} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.friendAvatar, { backgroundColor: colors.primary + '15' }]}>
+                        <Text style={[styles.avatarLetter, { color: colors.primary, fontSize: 14 }]}>
+                          {fp.user?.username?.[0]?.toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.friendMeta}>
+                      <Text style={[styles.friendName, { color: colors.text }]} numberOfLines={1}>
+                        {fp.user?.username}
+                      </Text>
+                      <View style={styles.friendSubMeta}>
+                        <Text style={[styles.friendProgressText, { color: colors.primary }]}>
+                          Ch. {fp.currentChapter}
+                        </Text>
+                        {progress && diff !== 0 && (
+                          <Text style={[styles.diffIndicator, { color: diff > 0 ? '#10B981' : '#EF4444' }]}>
+                            ({diff > 0 ? `+${diff}` : diff})
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
         )}
         {/* Collection Picker */}
@@ -1662,5 +1710,51 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '900',
+  },
+  friendsProgressScroll: {
+    paddingRight: Spacing.lg,
+    gap: 12,
+  },
+  friendProgressCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    width: 160,
+    gap: 10,
+  },
+  friendAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  friendMeta: {
+    flex: 1,
+  },
+  friendName: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  friendSubMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  miniStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  friendProgressText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  diffIndicator: {
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
