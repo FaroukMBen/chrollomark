@@ -10,6 +10,7 @@ interface User {
   bio: string;
   friends: string[];
   favoriteGenres: string[];
+  role: 'user' | 'admin';
 }
 
 interface AuthContextType {

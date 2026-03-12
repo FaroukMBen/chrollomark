@@ -462,6 +462,14 @@ class ApiService {
     async getDevLogs() {
         return this.request<any[]>('/devlog');
     }
+
+    async getAllFeedback() {
+        return this.request<any[]>('/support/feedback');
+    }
+
+    async getAllBugReports() {
+        return this.request<any[]>('/support/bug-reports');
+    }
 }
 
 export const api = new ApiService();

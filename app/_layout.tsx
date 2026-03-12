@@ -86,6 +86,7 @@ function RootLayoutInner() {
               name="profile/report-bug"
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
+            <Stack.Screen name="profile/admin" />
           </Stack>
         </ToastProvider>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />

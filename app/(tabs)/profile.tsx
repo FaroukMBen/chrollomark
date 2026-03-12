@@ -466,6 +466,25 @@ export default function ProfileScreen() {
             <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
+        
+        {/* ─── ADMIN PANEL ─── */}
+        {user?.role === 'admin' && (
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <IconSymbol name="lock.fill" size={16} color={colors.error} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Admin Panel</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.settingCard, styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+              onPress={() => router.push('/profile/admin')}>
+              <View style={styles.settingHeader}>
+                <IconSymbol name="shield.fill" size={15} color={colors.error} />
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Admin Dashboard</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* ─── SUPPORT ─── */}
         <View style={styles.section}>
