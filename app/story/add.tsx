@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -27,6 +27,9 @@ export default function AddStoryScreen() {
   const router = useRouter();
   const { showToast } = useToast();
 
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const isEditing = !!id;
+
   const [title, setTitle] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [description, setDescription] = useState('');
@@ -40,6 +43,39 @@ export default function AddStoryScreen() {
   const [storyStatus, setStoryStatus] = useState('Ongoing');
   const [contentRating, setContentRating] = useState('safe');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isEditing) {
+      loadStory();
+    }
+  }, [id]);
+
+  const loadStory = async () => {
+    setIsLoading(true);
+    try {
+      const data = await api.getStory(id!);
+      const s = data.story;
+      setTitle(s.title || '');
+      setCoverImage(s.coverImage || '');
+      setDescription(s.description || '');
+      setType(s.type || 'Manga');
+      setAuthor(s.author || '');
+      setTotalChapters(s.totalChapters ? String(s.totalChapters) : '');
+      setSelectedGenres(s.genres || []);
+      setYear(s.year ? String(s.year) : '');
+      setStoryStatus(s.status || 'Ongoing');
+      setContentRating(s.contentRating || 'safe');
+      
+      if (data.userProgress) {
+        setCurrentChapter(String(data.userProgress.currentChapter || 0));
+        setStatus(data.userProgress.status || 'Plan to Read');
+      }
+    } catch (error: any) {
+      showToast({ message: 'Failed to load story details', type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const toggleGenre = (genre: string) => {
     setSelectedGenres((prev) =>
@@ -67,15 +103,17 @@ export default function AddStoryScreen() {
     }
     setIsLoading(true);
     try {
-      // Check for duplicates by title
-      const existing = await api.getStories({ search: title.trim(), limit: '5' });
-      const duplicate = existing.stories?.find(
-        (s: any) => s.title.toLowerCase() === title.trim().toLowerCase()
-      );
-      if (duplicate) {
-        setIsLoading(false);
-        showToast({ message: `"${duplicate.title}" already exists on Chrollomark. Find it in Explore!`, type: 'error' });
-        return;
+      if (!isEditing) {
+        // Check for duplicates by title
+        const existing = await api.getStories({ search: title.trim(), limit: '5' });
+        const duplicate = existing.stories?.find(
+          (s: any) => s.title.toLowerCase() === title.trim().toLowerCase()
+        );
+        if (duplicate) {
+          setIsLoading(false);
+          showToast({ message: `"${duplicate.title}" already exists on Chrollomark. Find it in Explore!`, type: 'error' });
+          return;
+        }
       }
 
       const formData = new FormData();
@@ -101,7 +139,12 @@ export default function AddStoryScreen() {
         }
       }
 
-      const story = await api.createStory(formData);
+      let story;
+      if (isEditing) {
+        story = await api.updateStory(id!, formData);
+      } else {
+        story = await api.createStory(formData);
+      }
 
       await api.updateProgress({
         storyId: story._id,
@@ -109,7 +152,7 @@ export default function AddStoryScreen() {
         status,
       });
 
-      showToast({ message: 'Story added to your library!', type: 'success' });
+      showToast({ message: isEditing ? 'Story updated!' : 'Story added to your library!', type: 'success' });
       router.back();
     } catch (error: any) {
       showToast({ message: error.message, type: 'error' });
@@ -130,7 +173,7 @@ export default function AddStoryScreen() {
             onPress={() => router.back()}>
             <IconSymbol name="xmark" size={16} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Add Story</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{isEditing ? 'Edit Story' : 'Add Story'}</Text>
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={isLoading}

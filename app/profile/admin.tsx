@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -18,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { BorderRadius, Colors, Spacing, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
@@ -53,6 +53,14 @@ export default function AdminDashboard() {
   const [newStatus, setNewStatus] = useState('');
   const [adminNotes, setAdminNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Confirmation Modal state
+  const [confirmModal, setConfirmModal] = useState({
+    visible: false,
+    id: '',
+    title: '',
+    message: '',
+  });
 
   const loadData = async () => {
     try {
@@ -130,31 +138,29 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    Alert.alert(
-      'Delete Report',
-      'Are you sure you want to delete this report?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (activeTab === 'feedback') {
-                await api.deleteFeedback(id);
-              } else {
-                await api.deleteBugReport(id);
-              }
-              showToast({ message: 'Report deleted', type: 'success' });
-              loadData();
-            } catch (error: any) {
-              showToast({ message: 'Delete failed: ' + error.message, type: 'error' });
-            }
-          }
-        }
-      ]
-    );
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      visible: true,
+      id,
+      title: 'Delete Report',
+      message: 'Are you sure you want to delete this report?',
+    });
+  };
+
+  const onConfirmDelete = async () => {
+    const id = confirmModal.id;
+    setConfirmModal(prev => ({ ...prev, visible: false }));
+    try {
+      if (activeTab === 'feedback') {
+        await api.deleteFeedback(id);
+      } else {
+        await api.deleteBugReport(id);
+      }
+      showToast({ message: 'Report deleted', type: 'success' });
+      loadData();
+    } catch (error: any) {
+      showToast({ message: 'Delete failed: ' + error.message, type: 'error' });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -491,6 +497,15 @@ export default function AdminDashboard() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      <ConfirmModal
+        visible={confirmModal.visible}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={onConfirmDelete}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, visible: false }))}
+        isDestructive={true}
+      />
     </SafeAreaView>
   );
 }

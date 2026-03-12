@@ -139,7 +139,10 @@ router.put('/:id', [auth, upload.single('coverImage')], async (req, res) => {
         const story = await Story.findById(req.params.id);
         if (!story) return res.status(404).json({ message: 'Story not found' });
 
-        // Only the creator or anyone can update (community-driven)
+        // Only the creator or admin can update
+        if (story.addedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized to update this story' });
+        }
         const { title, description, type, genres, author, status, totalChapters } = req.body;
 
         let coverImageUrl = req.body.coverImage;
@@ -230,7 +233,7 @@ router.delete('/:id', auth, async (req, res) => {
         const story = await Story.findById(req.params.id);
         if (!story) return res.status(404).json({ message: 'Story not found' });
 
-        if (story.addedBy.toString() !== req.user._id.toString()) {
+        if (story.addedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized to delete this story' });
         }
 

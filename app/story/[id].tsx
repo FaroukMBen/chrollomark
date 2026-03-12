@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { BorderRadius, Colors, Shadows, Spacing, StatusColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
@@ -50,6 +50,16 @@ export default function StoryDetailScreen() {
 
   // Add to Collection modal
   const [showCollPicker, setShowCollPicker] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false);
+
+  // Confirmation Modal state
+  const [confirmModal, setConfirmModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDestructive: true,
+  });
 
   const loadData = useCallback(async () => {
     try {
@@ -139,6 +149,25 @@ export default function StoryDetailScreen() {
     }
   };
 
+  const handleRemoveFromLibrary = async () => {
+    setConfirmModal({
+      visible: true,
+      title: "Remove from Library",
+      message: "Are you sure you want to remove this story and all your reading progress?",
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, visible: false }));
+        try {
+          await api.removeFromLibrary(story?._id || id);
+          setProgress(null);
+          showToast({ message: 'Removed from library', type: 'success' });
+        } catch (error: any) {
+          showToast({ message: error.message, type: 'error' });
+        }
+      }
+    });
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     try {
       const storyId = story?._id || id;
@@ -147,6 +176,26 @@ export default function StoryDetailScreen() {
     } catch (error: any) {
       showToast({ message: error.message, type: 'error' });
     }
+  };
+
+  const handleDeleteStory = async () => {
+    setShowManageModal(false);
+    setConfirmModal({
+      visible: true,
+      title: "Delete Story",
+      message: "Are you sure you want to PERMANENTLY delete this story from the database? This cannot be undone.",
+      isDestructive: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, visible: false }));
+        try {
+          await api.deleteStory(story._id);
+          showToast({ message: 'Story deleted forever', type: 'success' });
+          router.back();
+        } catch (error: any) {
+          showToast({ message: error.message, type: 'error' });
+        }
+      }
+    });
   };
 
   const handleUpdateManualProgress = async () => {
@@ -332,14 +381,16 @@ export default function StoryDetailScreen() {
 
   const confirmRecommend = () => {
     if (isRecommended) {
-      Alert.alert(
-        "Remove Recommendation",
-        "Are you sure you want to remove this recommendation?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Yes", onPress: () => handleRecommend() }
-        ]
-      );
+      setConfirmModal({
+        visible: true,
+        title: "Remove Recommendation",
+        message: "Are you sure you want to remove this recommendation?",
+        isDestructive: true,
+        onConfirm: () => {
+          setConfirmModal(prev => ({ ...prev, visible: false }));
+          handleRecommend();
+        }
+      });
     } else {
       setShowRecoInput(!showRecoInput);
     }
@@ -362,10 +413,16 @@ export default function StoryDetailScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Back Button */}
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <IconSymbol name="arrow.left" size={24} color={colors.text} />
-        </TouchableOpacity>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <IconSymbol name="arrow.left" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerMoreBtn} 
+            onPress={() => setShowManageModal(true)}>
+            <IconSymbol name="ellipsis" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
         {/* Cover & Info */}
         <View style={styles.heroSection}>
@@ -429,7 +486,6 @@ export default function StoryDetailScreen() {
           </View>
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.actionRow}>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: progress ? colors.surfaceElevated : colors.primary, flex: 2 }]}
@@ -784,6 +840,68 @@ export default function StoryDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Management Options Modal */}
+      {showManageModal && (
+        <View style={StyleSheet.absoluteFill}>
+          <TouchableOpacity 
+            activeOpacity={1} 
+            style={styles.modalOverlay} 
+            onPress={() => setShowManageModal(false)} 
+          />
+          <View style={[styles.optionsMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.optionsHeader}>
+              <Text style={[styles.optionsTitle, { color: colors.text }]}>Manage Story</Text>
+              <View style={[styles.optionsStripe, { backgroundColor: colors.primary }]} />
+            </View>
+
+            {progress && (
+              <TouchableOpacity 
+                style={styles.optionItem} 
+                onPress={() => { setShowManageModal(false); handleRemoveFromLibrary(); }}>
+                <IconSymbol name="minus.circle.fill" size={20} color={colors.error} />
+                <Text style={[styles.optionText, { color: colors.error }]}>Remove from Library</Text>
+              </TouchableOpacity>
+            )}
+
+            {user?.role === 'admin' && !isMangaDex && (
+              <>
+                <View style={[styles.optionDivider, { backgroundColor: colors.border }]} />
+                <TouchableOpacity 
+                  style={styles.optionItem} 
+                  onPress={() => { 
+                    setShowManageModal(false); 
+                    router.push(`/story/add?id=${story._id}` as any); 
+                  }}>
+                  <IconSymbol name="pencil" size={20} color={colors.primary} />
+                  <Text style={[styles.optionText, { color: colors.text }]}>Edit Story Data</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.optionItem} 
+                  onPress={handleDeleteStory}>
+                  <IconSymbol name="list.bullet.rectangle.portrait" size={20} color={colors.error} />
+                  <Text style={[styles.optionText, { color: colors.error }]}>Delete (Permanent)</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity 
+              style={[styles.optionCancel, { backgroundColor: colors.surfaceElevated }]} 
+              onPress={() => setShowManageModal(false)}>
+              <Text style={[styles.optionCancelText, { color: colors.textSecondary }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      <ConfirmModal
+        visible={confirmModal.visible}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, visible: false }))}
+        isDestructive={confirmModal.isDestructive}
+      />
     </SafeAreaView>
   );
 }
@@ -791,7 +909,43 @@ export default function StoryDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingBottom: 60 },
+  headerRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingRight: Spacing.lg,
+  },
   backButton: { padding: Spacing.lg },
+  headerMoreBtn: { padding: Spacing.md },
+  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  optionsMenu: {
+    position: 'absolute',
+    bottom: 30,
+    left: 20,
+    right: 20,
+    borderRadius: BorderRadius.xl,
+    padding: 20,
+    borderWidth: 1,
+    ...Shadows.lg,
+  },
+  optionsHeader: { marginBottom: 20 },
+  optionsTitle: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
+  optionsStripe: { width: 30, height: 4, borderRadius: 2, marginTop: 4 },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 12,
+  },
+  optionText: { fontSize: 15, fontWeight: '700' },
+  optionDivider: { height: 1, width: '100%', marginVertical: 4, opacity: 0.5 },
+  optionCancel: {
+    marginTop: 15,
+    paddingVertical: 14,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+  },
+  optionCancelText: { fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   heroSection: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
@@ -829,6 +983,13 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   actionBtnText: { fontSize: 13, fontWeight: '700', marginLeft: Spacing.xs },
+  actionBtnIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   actionBtnOutline: {
     flex: 1,
     flexDirection: 'row',
