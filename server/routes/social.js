@@ -4,6 +4,7 @@ const FriendRequest = require('../models/FriendRequest');
 const ReadingProgress = require('../models/ReadingProgress');
 const Review = require('../models/Review');
 const Recommendation = require('../models/Recommendation');
+const DevLog = require('../models/DevLog');
 const auth = require('../middleware/auth');
 const { emitToUser, emitToFriends } = require('../socket');
 
@@ -313,15 +314,18 @@ router.get('/activity', auth, async (req, res) => {
 router.get('/feed', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
-        const friendIds = user.friends;
+        const activityUserIds = [...user.friends, user._id];
 
-        if (friendIds.length === 0) {
+        // 0) Latest Dev Log
+        const latestDevLog = await DevLog.findOne().sort('-date');
+        
+        if (activityUserIds.length === 0 && !latestDevLog) {
             return res.json({ feed: [], recommendations: [] });
         }
 
-        // 1) Friend reviews (last 30 days)
+        // 1) User & Friend reviews (last 30 days)
         const recentReviews = await Review.find({
-            user: { $in: friendIds },
+            user: { $in: activityUserIds },
             createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
         })
             .sort('-createdAt')
@@ -329,9 +333,9 @@ router.get('/feed', auth, async (req, res) => {
             .populate('user', 'username avatar')
             .populate('story', 'title coverImage type author');
 
-        // 2) Friend progress updates (last 7 days)
+        // 2) User & Friend progress updates (last 7 days)
         const recentProgress = await ReadingProgress.find({
-            user: { $in: friendIds },
+            user: { $in: activityUserIds },
             lastReadDate: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         })
             .sort('-lastReadDate')
@@ -339,9 +343,9 @@ router.get('/feed', auth, async (req, res) => {
             .populate('user', 'username avatar')
             .populate('story', 'title coverImage type');
 
-        // 3) Friend recommendations (last 30 days)
+        // 3) User & Friend recommendations (last 30 days)
         const recentRecommendations = await Recommendation.find({
-            user: { $in: friendIds },
+            user: { $in: activityUserIds },
             createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
         })
             .sort('-createdAt')
@@ -389,12 +393,98 @@ router.get('/feed', auth, async (req, res) => {
             });
         }
 
+        if (latestDevLog) {
+            feed.push({
+                type: 'dev_log',
+                id: `devlog-${latestDevLog._id}`,
+                title: latestDevLog.title,
+                category: latestDevLog.category,
+                content: latestDevLog.content,
+                timestamp: latestDevLog.date || latestDevLog.updatedAt
+            });
+        }
+
         // Sort by timestamp descending
         feed.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        // 3) Recommendations: stories that multiple friends have read and rated highly
+        // Grouping logic (Steam-style)
+        const groupedFeed = [];
+        if (feed.length > 0) {
+            let currentGroup = null;
+
+            for (const item of feed) {
+                const itemDate = new Date(item.timestamp).toDateString();
+                
+                // We only group 'progress'
+                const canGroup = item.type === 'progress';
+
+                if (canGroup && currentGroup && 
+                    currentGroup.type === item.type && 
+                    currentGroup.user._id.toString() === item.user._id.toString() &&
+                    currentGroup.dateString === itemDate
+                ) {
+                    currentGroup.items.push(item);
+                } else {
+                    if (currentGroup) {
+                        if (currentGroup.items.length > 1) {
+                            groupedFeed.push({
+                                type: 'grouped_progress',
+                                id: `grouped-${currentGroup.items[0].id}`,
+                                user: currentGroup.user,
+                                dateString: currentGroup.dateString,
+                                itemsCount: currentGroup.items.length,
+                                stories: currentGroup.items.map(i => ({
+                                    story: i.story,
+                                    currentChapter: i.currentChapter,
+                                    status: i.status
+                                })),
+                                timestamp: currentGroup.items[0].timestamp
+                            });
+                        } else {
+                            groupedFeed.push(currentGroup.items[0]);
+                        }
+                    }
+
+                    currentGroup = {
+                        type: item.type,
+                        user: item.user,
+                        dateString: itemDate,
+                        items: [item]
+                    };
+
+                    // If it's a non-groupable item like dev_log or review, push it immediately after ending previous group logic
+                    if (!canGroup) {
+                        groupedFeed.push(item);
+                        currentGroup = null; // Don't group next items with this
+                    }
+                }
+            }
+
+            // Final check for the last group
+            if (currentGroup) {
+                if (currentGroup.items.length > 1) {
+                    groupedFeed.push({
+                        type: 'grouped_progress',
+                        id: `grouped-${currentGroup.items[0].id}`,
+                        user: currentGroup.user,
+                        dateString: currentGroup.dateString,
+                        itemsCount: currentGroup.items.length,
+                        stories: currentGroup.items.map(i => ({
+                            story: i.story,
+                            currentChapter: i.currentChapter,
+                            status: i.status
+                        })),
+                        timestamp: currentGroup.items[0].timestamp
+                    });
+                } else {
+                    groupedFeed.push(currentGroup.items[0]);
+                }
+            }
+        }
+
+        // 4) Recommendations: stories that multiple friends have read and rated highly
         const friendProgress = await ReadingProgress.find({
-            user: { $in: friendIds },
+            user: { $in: user.friends },
             status: { $in: ['Reading', 'Completed'] },
         }).populate('story', 'title coverImage type author averageRating totalReaders');
 
@@ -424,7 +514,7 @@ router.get('/feed', auth, async (req, res) => {
                 friendCount: item.friendsReading.length,
             }));
 
-        res.json({ feed: feed.slice(0, 50), recommendations });
+        res.json({ feed: groupedFeed.slice(0, 50), recommendations });
     } catch (error) {
         console.error('Feed error:', error);
         res.status(500).json({ message: 'Server error' });
