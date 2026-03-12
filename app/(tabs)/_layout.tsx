@@ -1,16 +1,24 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+const TabBarIcon = ({ name, color, focused }: { name: any; color: string; focused: boolean }) => (
+  <IconSymbol size={focused ? 28 : 24} name={name} color={color} />
+);
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
+
+  const tabHeight = 55 + (Platform.OS === 'ios' ? Math.max(insets.bottom, 20) : insets.bottom);
 
   return (
     <Tabs
@@ -24,8 +32,8 @@ export default function TabLayout() {
           borderTopColor: isDark ? 'rgba(139, 92, 246, 0.1)' : '#E2E8F0',
           borderTopWidth: 1,
           paddingTop: 6,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-          height: Platform.OS === 'ios' ? 85 : 65,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          height: tabHeight,
           ...(isDark ? {} : Shadows.sm),
         },
         tabBarLabelStyle: {
@@ -42,7 +50,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol size={focused ? 28 : 24} name="house.fill" color={color} />
+            <TabBarIcon name="house.fill" color={color} focused={focused} />
           ),
         }}
       />
@@ -51,7 +59,7 @@ export default function TabLayout() {
         options={{
           title: 'Library',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol size={focused ? 28 : 24} name="book.fill" color={color} />
+            <TabBarIcon name="book.fill" color={color} focused={focused} />
           ),
         }}
       />
@@ -60,7 +68,7 @@ export default function TabLayout() {
         options={{
           title: 'Explore',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol size={focused ? 28 : 24} name="magnifyingglass" color={color} />
+            <TabBarIcon name="magnifyingglass" color={color} focused={focused} />
           ),
         }}
       />
@@ -69,7 +77,7 @@ export default function TabLayout() {
         options={{
           title: 'Social',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol size={focused ? 28 : 24} name="person.2.fill" color={color} />
+            <TabBarIcon name="person.2.fill" color={color} focused={focused} />
           ),
         }}
       />
@@ -78,7 +86,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol size={focused ? 28 : 24} name="person.crop.circle" color={color} />
+            <TabBarIcon name="person.crop.circle" color={color} focused={focused} />
           ),
         }}
       />
