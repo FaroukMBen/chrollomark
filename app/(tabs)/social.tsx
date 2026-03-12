@@ -561,30 +561,36 @@ export default function SocialScreen() {
   );
 
   const renderDevLogItem = (item: any) => (
-    <TouchableOpacity 
-      key={item.id} 
-      style={[styles.feedCard, styles.devLogCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.feedCard, styles.devLogCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
       onPress={() => router.push('/profile/dev-log')}
       activeOpacity={0.9}>
-      <View style={styles.feedHeader}>
-        <View style={[styles.devLogIcon, { backgroundColor: colors.primary + '30' }]}>
-          <IconSymbol name="hammer.fill" size={12} color={colors.primary} />
+      <LinearGradient
+        colors={[colors.primary + '15', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.devLogHeader}>
+        <View style={[styles.devLogBadge, { backgroundColor: colors.primary }]}>
+          <Text style={styles.devLogBadgeText}>SYSTEM UPDATE</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.feedUserName, { color: colors.text }]}>SYSTEM UPDATE</Text>
-          <Text style={[styles.feedAction, { color: colors.textSecondary }]}>Patch Notes Released</Text>
-        </View>
-        <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
+        <Text style={[styles.devLogDate, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
       </View>
-      
-      <View style={[styles.devLogContent, { backgroundColor: colors.surfaceElevated, borderRadius: BorderRadius.md, padding: Spacing.sm }]}>
-        <Text style={[styles.devLogTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
-        <Text style={[styles.devLogSnippet, { color: colors.textSecondary }]} numberOfLines={2}>{item.content}</Text>
-        
-        <TouchableOpacity style={[styles.moreActivityBtn, { borderTopWidth: 1, borderTopColor: colors.border + '30' }]} activeOpacity={0.7}>
-           <Text style={[styles.viewDevLogText, { color: colors.primary }]}>View roadmap & changes</Text>
-           <IconSymbol name="arrow.right" size={12} color={colors.primary} style={{ marginLeft: 4 }} />
-        </TouchableOpacity>
+
+      <View style={styles.devLogContent}>
+        <Text style={[styles.devLogTitle, { color: colors.text }]} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={[styles.devLogSnippet, { color: colors.textSecondary }]} numberOfLines={2}>
+          {item.content}
+        </Text>
+
+        <View style={styles.devLogFooter}>
+          <Text style={[styles.viewDevLogText, { color: colors.primary }]}>View Patch Notes</Text>
+          <IconSymbol name="chevron.right" size={12} color={colors.primary} />
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -1132,12 +1138,21 @@ const styles = StyleSheet.create({
   collectionActivityCard: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.lg, gap: Spacing.md },
   collIconBg: { width: 44, height: 44, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
   // Dev Log Styles
-  devLogCard: { overflow: 'hidden' },
-  devLogIcon: { width: 24, height: 24, borderRadius: BorderRadius.full, justifyContent: 'center', alignItems: 'center' },
-  devLogContent: { marginHorizontal: Spacing.sm },
-  devLogTitle: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
-  devLogSnippet: { fontSize: 13, lineHeight: 18 },
-  devLogFooter: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' },
+  devLogCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+    ...Shadows.md,
+  },
+  devLogHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  devLogBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.sm },
+  devLogBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  devLogDate: { fontSize: 11, fontWeight: '600' },
+  devLogContent: { paddingHorizontal: 0 },
+  devLogTitle: { fontSize: 18, fontWeight: '900', letterSpacing: -0.4, marginBottom: 8 },
+  devLogSnippet: { fontSize: 13, lineHeight: 18, marginBottom: 16 },
+  devLogFooter: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   viewDevLogText: { fontSize: 12, fontWeight: '700' },
   meBadge: {
     paddingHorizontal: 6,

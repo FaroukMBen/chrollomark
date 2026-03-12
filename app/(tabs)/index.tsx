@@ -29,6 +29,7 @@ export default function HomeScreen() {
   const [currentlyReading, setCurrentlyReading] = useState<any[]>([]);
   const [trendingStories, setTrendingStories] = useState<any[]>([]);
   const [recentlyUpdated, setRecentlyUpdated] = useState<any[]>([]);
+  const [latestLog, setLatestLog] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -42,13 +43,15 @@ export default function HomeScreen() {
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const [statsData, readingData, allProgressData, trendingData] = await Promise.all([
+      const [statsData, readingData, allProgressData, trendingData, logsData] = await Promise.all([
         api.getProgressStats(),
         api.getMyProgress({ status: 'Reading' }),
         api.getMyProgress({}),
         api.getStories({ sort: 'popularity', limit: '10' }),
+        api.getDevLogs(),
       ]);
       setStats(statsData);
+      setLatestLog(logsData?.[0] || null);
       setCurrentlyReading(readingData.slice(0, 8));
       setTrendingStories(trendingData.stories);
       // Show recently completed or updated
@@ -352,7 +355,38 @@ export default function HomeScreen() {
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
               </View>
             </View>
+
             <View style={{ marginTop: Spacing.xs }}>
+              {/* Latest Dev Log Card - The "Outstanding" UI */}
+              {latestLog && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => router.push('/profile/dev-log')}
+                  style={[styles.devLogCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
+                  <LinearGradient
+                    colors={[colors.primary + '15', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={styles.devLogHeader}>
+                    <View style={[styles.devLogBadge, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.devLogBadgeText}>{latestLog.category.toUpperCase()}</Text>
+                    </View>
+                    <Text style={[styles.devLogDate, { color: colors.textSecondary }]}>
+                      {new Date(latestLog.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                  <Text style={[styles.devLogTitle, { color: colors.text }]} numberOfLines={2}>
+                    {latestLog.title}
+                  </Text>
+                  <View style={styles.devLogFooter}>
+                    <Text style={[styles.devLogAction, { color: colors.primary }]}>View Patch Notes</Text>
+                    <IconSymbol name="chevron.right" size={12} color={colors.primary} />
+                  </View>
+                </TouchableOpacity>
+              )}
+
               {recentlyUpdated.map((item) => (
                 <TouchableOpacity
                   key={item._id}
@@ -541,6 +575,24 @@ const styles = StyleSheet.create({
 
   emptyCard: { marginHorizontal: Spacing.lg, padding: Spacing.xl, borderRadius: BorderRadius.xl, alignItems: 'center', borderWidth: 1, borderStyle: 'dashed', gap: Spacing.sm },
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22, fontWeight: '500' },
+
+  // Dev Log Card
+  devLogCard: {
+    marginHorizontal: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+    ...Shadows.md,
+  },
+  devLogHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  devLogBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.sm },
+  devLogBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  devLogDate: { fontSize: 11, fontWeight: '600' },
+  devLogTitle: { fontSize: 18, fontWeight: '900', letterSpacing: -0.4, marginBottom: 12 },
+  devLogFooter: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  devLogAction: { fontSize: 12, fontWeight: '700' },
   
   welcomeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
   logoBg: { width: 100, height: 100, borderRadius: BorderRadius.xl, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.lg },
