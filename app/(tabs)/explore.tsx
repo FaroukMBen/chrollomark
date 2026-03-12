@@ -6,12 +6,11 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,10 +24,9 @@ import { useToast } from '@/store/ToastContext';
 type SourceTab = 'local' | 'mangadex';
 
 const ORDER_OPTIONS = [
-  { label: 'Popular', value: 'followedCount', icon: 'flame.fill' as const },
+  { label: 'Popular', value: 'popularity', icon: 'flame.fill' as const },
   { label: 'Latest', value: 'latestUploadedChapter', icon: 'clock.fill' as const },
   { label: 'New', value: 'createdAt', icon: 'sparkles' as const },
-  { label: 'Relevance', value: 'relevance', icon: 'star.fill' as const },
   { label: 'Title', value: 'title', icon: 'textformat' as const },
 ];
 
@@ -40,9 +38,9 @@ const STATUS_OPTIONS = [
 ];
 
 const CONTENT_RATINGS = [
-  { label: 'Safe', value: 'safe' },
-  { label: 'Suggestive', value: 'suggestive' },
-  { label: 'Pornographic', value: 'pornographic' },
+  { label: 'Safe', value: 'safe', color: '#10B981' },
+  { label: 'Suggestive', value: 'suggestive', color: '#F59E0B' },
+  { label: 'Pornographic', value: 'pornographic', color: '#EF4444' },
 ];
 
 const statusColor = (status: string) => {
@@ -85,21 +83,21 @@ export default function ExploreScreen() {
   const [mdLoading, setMdLoading] = useState(false);
 
   // Shared filter state (used by BOTH tabs for a unified experience)
-  const [order, setOrder] = useState('followedCount');
+  const [order, setOrder] = useState('popularity');
   const [statusFilter, setStatusFilter] = useState('');
   const [contentRating, setContentRating] = useState('safe,suggestive');
   const [showFilters, setShowFilters] = useState(false);
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0;
-    if (order !== 'followedCount') count++;
+    if (order !== 'popularity') count++;
     if (statusFilter !== '') count++;
     if (contentRating !== 'safe,suggestive') count++;
     return count;
   }, [order, statusFilter, contentRating]);
 
   const resetFilters = () => {
-    setOrder('followedCount');
+    setOrder('popularity');
     setStatusFilter('');
     setContentRating('safe,suggestive');
   };
@@ -126,7 +124,13 @@ export default function ExploreScreen() {
   const loadLocal = useCallback(async (pageNum = 1, append = false) => {
     setLocalLoading(true);
     try {
-      const params: any = { page: String(pageNum), limit: '20', sort: order === 'followedCount' ? '-views' : order === 'latestUploadedChapter' ? '-updatedAt' : order === 'relevance' ? '-averageRating' : order === 'title' ? 'title' : `-${order}` };
+      let sortParam = `-${order}`;
+      if (order === 'popularity') sortParam = 'popularity';
+      else if (order === 'latestUploadedChapter') sortParam = '-updatedAt';
+      else if (order === 'title') sortParam = 'title';
+
+      const params: any = { page: String(pageNum), limit: '20', sort: sortParam };
+      
       if (searchRef.current.trim()) params.search = searchRef.current.trim();
       if (statusFilter) {
         // Map lowercase to our DB status
@@ -421,12 +425,22 @@ export default function ExploreScreen() {
             )}
           </View>
           <TouchableOpacity 
-            style={[styles.filterToggleBtn, { backgroundColor: showFilters ? colors.primary : colors.surface, borderColor: colors.border }]}
-            onPress={() => setShowFilters(!showFilters)}>
-            <IconSymbol name="line.3.horizontal.decrease" size={18} color={showFilters ? "#FFF" : colors.textSecondary} />
+            style={[
+              styles.filterActionButtonPremium, 
+              { backgroundColor: colors.surfaceElevated },
+              showFilters && { borderColor: colors.primary, borderWidth: 1, backgroundColor: colors.primary + '10' }
+            ]}
+            onPress={() => setShowFilters(!showFilters)}
+            activeOpacity={0.7}>
+            <IconSymbol 
+              name="line.3.horizontal.decrease" 
+              size={14} 
+              color={showFilters ? colors.primary : colors.text} 
+            />
+            <Text style={[styles.filterActionText, { color: showFilters ? colors.primary : colors.text }]}>Filters</Text>
             {activeFilterCount > 0 && (
-              <View style={styles.filterDotBadge}>
-                <Text style={styles.filterDotText}>{activeFilterCount}</Text>
+              <View style={[styles.activeBadgeSmall, { backgroundColor: colors.primary }]}>
+                <Text style={styles.activeBadgeText}>{activeFilterCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -434,72 +448,93 @@ export default function ExploreScreen() {
 
         {/* Collapsible Filter Container */}
         {showFilters && (
-          <View style={[styles.collapsibleFilters, { backgroundColor: colors.surfaceElevated, borderBottomColor: colors.border }]}>
-            <View style={styles.filterHeaderRow}>
-               <View style={styles.filterTitleGroup}>
-                 <IconSymbol name="line.3.horizontal.decrease" size={14} color={colors.textSecondary} />
-                 <Text style={[styles.filterHeaderTitle, { color: colors.text }]}>Active Filters</Text>
-               </View>
-               <TouchableOpacity 
-                 style={[styles.resetBtn, { backgroundColor: colors.primary + '15' }]} 
-                 onPress={resetFilters}
-                 activeOpacity={0.7}>
-                 <IconSymbol name="arrow.counterclockwise" size={12} color={colors.primary} />
-                 <Text style={[styles.resetText, { color: colors.primary }]}>Reset All</Text>
-               </TouchableOpacity>
+          <View style={[styles.filterPanelFull, { backgroundColor: colors.surface + '40', borderBottomColor: colors.border, marginTop: Spacing.sm }]}>            
+            {/* Sort Section */}
+            <View style={styles.filterSection}>
+              <View style={styles.filterPanelHeader}>
+                <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>SORT BY</Text>
+                <TouchableOpacity 
+                   style={[styles.resetActionPremium, { backgroundColor: colors.primary + '10' }]} 
+                   onPress={resetFilters} 
+                   activeOpacity={0.7}>
+                  <IconSymbol name="arrow.counterclockwise" size={12} color={colors.primary} />
+                  <Text style={[styles.resetActionText, { color: colors.primary }]}>Clear Filters</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.filterGridWrapContainer}>
+                {ORDER_OPTIONS.map(opt => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.filterTilePremium,
+                      { backgroundColor: colors.surfaceElevated, minWidth: '30%', flexGrow: 1 },
+                      order === opt.value && { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderWidth: 1 }
+                    ]}
+                    onPress={() => setOrder(opt.value)}>
+                    <IconSymbol name={opt.icon} size={12} color={order === opt.value ? colors.primary : colors.textSecondary} />
+                    <Text style={[styles.filterTileText, { color: order === opt.value ? colors.primary : colors.text }]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
-            {/* Filter pills */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent} style={styles.filterRow}>
-              {ORDER_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[styles.filterChip, {
-                    backgroundColor: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) + '20' : colors.surface,
-                    borderColor: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.border,
-                  }]}
-                  onPress={() => setOrder(opt.value)}>
-                  <IconSymbol name={opt.icon} size={12} color={order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.textSecondary} />
-                  <Text style={[styles.filterText, { color: order === opt.value ? (source === 'mangadex' ? '#FF6740' : colors.primary) : colors.textSecondary }]}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {/* Status Section */}
+            <View style={[styles.filterSection, { marginTop: Spacing.lg }]}>
+              <View style={styles.filterPanelHeader}>
+                <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>RELEASE STATUS</Text>
+              </View>
+              
+              <View style={styles.filterGridWrapContainer}>
+                {STATUS_OPTIONS.map(opt => {
+                  const isActive = statusFilter === opt.value;
+                  const chipColor = opt.value ? statusColor(opt.value) : colors.primary;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[
+                        styles.filterChipPremium,
+                        { backgroundColor: colors.surfaceElevated },
+                        isActive && { backgroundColor: chipColor + '15', borderColor: chipColor, borderWidth: 1 }
+                      ]}
+                      onPress={() => setStatusFilter(opt.value)}>
+                      <View style={[styles.statusDotPremium, { backgroundColor: chipColor }]} />
+                      <Text style={[styles.filterChipText, { color: isActive ? chipColor : colors.text }]}>{opt.label || 'All Status'}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent} style={styles.filterRow2}>
-              {STATUS_OPTIONS.map(opt => {
-                const isActive = statusFilter === opt.value;
-                const chipColor = opt.value ? statusColor(opt.value) : colors.primary;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.filterChip, {
-                      backgroundColor: isActive ? chipColor + '20' : colors.surface,
-                      borderColor: isActive ? chipColor : colors.border,
-                    }]}
-                    onPress={() => setStatusFilter(opt.value)}>
-                    <Text style={[styles.filterText, { color: isActive ? chipColor : colors.textSecondary }]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-              {CONTENT_RATINGS.map(opt => {
-                const active = contentRating.includes(opt.value);
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.filterChip, {
-                      backgroundColor: active ? colors.primary + '20' : colors.surface,
-                      borderColor: active ? colors.primary : colors.border,
-                    }]}
-                    onPress={() => {
-                      const arr = contentRating.split(',').filter(Boolean);
-                      setContentRating(active ? arr.filter(r => r !== opt.value).join(',') || 'safe' : [...arr, opt.value].join(','));
-                    }}>
-                    <Text style={[styles.filterText, { color: active ? colors.primary : colors.textSecondary }]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            {/* Maturity Section */}
+            <View style={[styles.filterSection, { marginTop: Spacing.lg }]}>
+              <View style={styles.filterPanelHeader}>
+                <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>MATURITY</Text>
+              </View>
+              
+              <View style={styles.filterGridWrapContainer}>
+                {CONTENT_RATINGS.map(opt => {
+                  const active = contentRating.includes(opt.value);
+                  const levelColor = opt.color;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[
+                        styles.filterChipPremium,
+                        { backgroundColor: colors.surfaceElevated },
+                        active && { backgroundColor: levelColor + '15', borderColor: levelColor, borderWidth: 1 }
+                      ]}
+                      onPress={() => {
+                        const arr = contentRating.split(',').filter(Boolean);
+                        setContentRating(active ? arr.filter(r => r !== opt.value).join(',') || 'safe' : [...arr, opt.value].join(','));
+                      }}>
+                      <View style={[styles.statusDotPremium, { backgroundColor: levelColor }]} />
+                      <Text style={[styles.filterChipText, { color: active ? levelColor : colors.text }]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           </View>
         )}
 
@@ -577,59 +612,75 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   sourceTabText: { fontSize: 13, fontWeight: '700' },
-  filterToggleBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Shadows.sm,
-  },
-  filterDotBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#EF4444',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFF',
-    zIndex: 1,
-  },
-  filterDotText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  collapsibleFilters: {
-    marginTop: Spacing.sm,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    paddingTop: Spacing.xs,
-  },
-  filterHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    marginTop: Spacing.xs,
-  },
-  filterTitleGroup: {
+  filterActionButtonPremium: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 16,
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    ...Shadows.sm,
   },
-  filterHeaderTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.2,
+  filterActionText: { fontSize: 13, fontWeight: '700' },
+  activeBadgeSmall: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  resetBtn: {
+  activeBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
+  filterPanelFull: { 
+    paddingTop: Spacing.xs, 
+    paddingBottom: Spacing.xl,
+    borderBottomWidth: 1,
+    width: '100%'
+  },
+  filterSection: { width: '100%' },
+  filterPanelHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md
+  },
+  filterPanelLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+  filterGridContainer: { 
+    flexDirection: 'row', 
+    gap: 8, 
+    paddingHorizontal: Spacing.lg
+  },
+  filterGridWrapContainer: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap',
+    gap: 8, 
+    paddingHorizontal: Spacing.lg
+  },
+  filterTilePremium: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8,
+    paddingHorizontal: 14, 
+    paddingVertical: 10, 
+    borderRadius: BorderRadius.md, 
+    justifyContent: 'center',
+    ...Shadows.sm
+  },
+  filterTileText: { fontSize: 12, fontWeight: '800' },
+  filterChipPremium: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8,
+    paddingHorizontal: 12, 
+    paddingVertical: 10, 
+    borderRadius: BorderRadius.md, 
+    minWidth: '30%',
+    flexGrow: 1,
+    ...Shadows.sm
+  },
+  statusDotPremium: { width: 6, height: 6, borderRadius: 3 },
+  filterChipText: { fontSize: 12, fontWeight: '700' },
+  resetActionPremium: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -637,12 +688,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
   },
-  resetText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  filterRow: { marginTop: Spacing.xs, maxHeight: 42 },
-  filterRow2: { marginTop: Spacing.xs, maxHeight: 42 },
+  resetActionText: { fontSize: 11, fontWeight: '800' },
   searchContainer: { paddingHorizontal: Spacing.lg, marginTop: Spacing.sm, flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
   searchBar: {
     flex: 1,
@@ -655,17 +701,23 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   searchInput: { flex: 1, fontSize: 14 },
-  filterContent: { paddingHorizontal: Spacing.lg, gap: 6 },
+  filterContent: { paddingHorizontal: Spacing.lg, gap: 8 },
+  filterContentWrap: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    paddingHorizontal: Spacing.lg, 
+    gap: 8 
+  },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
   },
-  filterText: { fontSize: 11, fontWeight: '600' },
+  filterText: { fontSize: 12, fontWeight: '700' },
   divider: { width: 1, height: 18, alignSelf: 'center', marginHorizontal: 2 },
   resultsHeader: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, paddingBottom: Spacing.xs },
   resultsCount: { fontSize: 12, fontWeight: '500' },
