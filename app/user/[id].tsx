@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, Spacing, StatusColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
+import { useAuth } from '@/store/AuthContext';
 import { useSocket } from '@/store/SocketContext';
 import { useToast } from '@/store/ToastContext';
 
@@ -26,6 +27,7 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { showToast } = useToast();
   const { socket } = useSocket();
+  const { user: currentUser } = useAuth();
 
   const [profile, setProfile] = useState<any>(null);
   const [collections, setCollections] = useState<any[]>([]);
@@ -161,50 +163,52 @@ export default function UserProfileScreen() {
           </View>
 
           {/* Friendship Status */}
-          <View style={styles.actionRow}>
-            {profile.isFriend ? (
-              <>
-                <View style={[styles.friendBadge, { backgroundColor: colors.success + '15' }]}>
-                  <IconSymbol name="checkmark.circle.fill" size={16} color={colors.success} />
-                  <Text style={[styles.friendBadgeText, { color: colors.success }]}>Friends</Text>
-                </View>
+          {currentUser?._id !== id && (
+            <View style={styles.actionRow}>
+              {profile.isFriend ? (
+                <>
+                  <View style={[styles.friendBadge, { backgroundColor: colors.success + '15' }]}>
+                    <IconSymbol name="checkmark.circle.fill" size={16} color={colors.success} />
+                    <Text style={[styles.friendBadgeText, { color: colors.success }]}>Friends</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.removeFriendBtn, { backgroundColor: colors.error + '10', borderColor: colors.error + '30' }]}
+                    onPress={() => showConfirm('Remove Friend', `Are you sure you want to remove ${profile.user.username}?`, () => handleAction('remove'))}>
+                    <IconSymbol name="person.badge.minus" size={18} color={colors.error} />
+                    <Text style={[styles.removeFriendText, { color: colors.error }]}>Remove</Text>
+                  </TouchableOpacity>
+                </>
+              ) : profile.requestStatus?.sent ? (
                 <TouchableOpacity
-                  style={[styles.removeFriendBtn, { backgroundColor: colors.error + '10', borderColor: colors.error + '30' }]}
-                  onPress={() => showConfirm('Remove Friend', `Are you sure you want to remove ${profile.user.username}?`, () => handleAction('remove'))}>
-                  <IconSymbol name="person.badge.minus" size={18} color={colors.error} />
-                  <Text style={[styles.removeFriendText, { color: colors.error }]}>Remove</Text>
+                  style={[styles.addFriendBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.primary }]}
+                  onPress={() => handleAction('cancel')}>
+                  <IconSymbol name="xmark" size={18} color={colors.primary} />
+                  <Text style={[styles.addFriendText, { color: colors.primary }]}>Cancel Request</Text>
                 </TouchableOpacity>
-              </>
-            ) : profile.requestStatus?.sent ? (
-              <TouchableOpacity
-                style={[styles.addFriendBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.primary }]}
-                onPress={() => handleAction('cancel')}>
-                <IconSymbol name="xmark" size={18} color={colors.primary} />
-                <Text style={[styles.addFriendText, { color: colors.primary }]}>Cancel Request</Text>
-              </TouchableOpacity>
-            ) : profile.requestStatus?.received ? (
-              <View style={{ flexDirection: 'row', gap: 10 }}>
+              ) : profile.requestStatus?.received ? (
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    style={[styles.addFriendBtn, { backgroundColor: colors.primary }]}
+                    onPress={() => handleAction('accept')}>
+                    <IconSymbol name="checkmark" size={18} color="#FFF" />
+                    <Text style={styles.addFriendText}>Accept</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.addFriendBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                    onPress={() => handleAction('decline')}>
+                    <Text style={[styles.addFriendText, { color: colors.textSecondary }]}>Decline</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
                 <TouchableOpacity
                   style={[styles.addFriendBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => handleAction('accept')}>
-                  <IconSymbol name="checkmark" size={18} color="#FFF" />
-                  <Text style={styles.addFriendText}>Accept</Text>
+                  onPress={() => handleAction('send')}>
+                  <IconSymbol name="person.badge.plus" size={18} color="#FFF" />
+                  <Text style={styles.addFriendText}>Add Friend</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.addFriendBtn, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-                  onPress={() => handleAction('decline')}>
-                  <Text style={[styles.addFriendText, { color: colors.textSecondary }]}>Decline</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.addFriendBtn, { backgroundColor: colors.primary }]}
-                onPress={() => handleAction('send')}>
-                <IconSymbol name="person.badge.plus" size={18} color="#FFF" />
-                <Text style={styles.addFriendText}>Add Friend</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+              )}
+            </View>
+          )}
         </View>
 
         <ConfirmModal
@@ -261,7 +265,7 @@ export default function UserProfileScreen() {
         {/* Content */}
         <View style={styles.content}>
           {activeTab === 'progress' && (
-            profile.isFriend ? (
+            (profile.isFriend || currentUser?._id === id) ? (
               <View>
                 <View style={styles.sectionTabHeader}>
                   <Text style={[styles.sectionTitleSmall, { color: colors.textSecondary }]}>

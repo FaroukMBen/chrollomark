@@ -302,6 +302,16 @@ export default function ProfileScreen() {
                 </>
               )}
             </View>
+
+            {!isEditing && (
+              <View style={styles.headerRightActions}>
+                 <TouchableOpacity 
+                   style={[styles.iconBtn, { backgroundColor: colors.surfaceElevated }]} 
+                   onPress={() => setIsEditing(true)}>
+                   <IconSymbol name="pencil" size={16} color={colors.text} />
+                 </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {isEditing ? (
@@ -326,9 +336,11 @@ export default function ProfileScreen() {
           ) : (
             <>
               {user?.bio ? <Text style={[styles.bio, { color: colors.textSecondary }]}>{user.bio}</Text> : null}
-              <TouchableOpacity style={[styles.editProfileBtn, { borderColor: colors.primary + '40' }]} onPress={() => setIsEditing(true)}>
-                <IconSymbol name="pencil" size={13} color={colors.primary} />
-                <Text style={[styles.editProfileText, { color: colors.primary }]}>Edit Profile</Text>
+              <TouchableOpacity 
+                style={[styles.viewPublicBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]} 
+                onPress={() => user?._id && router.push(`/user/${user._id}` as any)}>
+                <IconSymbol name="eye.fill" size={14} color={colors.primary} />
+                <Text style={[styles.viewPublicText, { color: colors.primary }]}>View Public Profile</Text>
               </TouchableOpacity>
             </>
           )}
@@ -635,18 +647,32 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   profileEmail: { fontSize: 12, marginTop: 2, fontWeight: '500' },
   bio: { fontSize: 13, marginTop: Spacing.md, lineHeight: 18 },
-  editProfileBtn: {
+  viewPublicBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    gap: 8,
     marginTop: Spacing.md,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: BorderRadius.full,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
   },
-  editProfileText: { fontSize: 12, fontWeight: '700' },
+  viewPublicText: { fontSize: 13, fontWeight: '700' },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+  },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   editSection: { marginTop: Spacing.md, gap: Spacing.sm },
   editInput: { padding: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, fontSize: 14 },
   textArea: { minHeight: 70, textAlignVertical: 'top' },
