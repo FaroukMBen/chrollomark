@@ -5,6 +5,7 @@ const Review = require('../models/Review');
 const Recommendation = require('../models/Recommendation');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { uploadToGridFS, deleteFromGridFS } = require('../utils/imageHandler');
 
 const router = express.Router();
 
@@ -16,7 +17,8 @@ router.post('/', [auth, upload.single('coverImage')], async (req, res) => {
 
         let coverImageUrl = req.body.coverImage; // Allow string URL fallback
         if (req.file) {
-            coverImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+            const imageId = await uploadToGridFS(req.file.buffer, req.file);
+            coverImageUrl = `${req.protocol}://${req.get('host')}/api/images/${imageId}`;
         }
 
         const story = new Story({
@@ -154,7 +156,14 @@ router.put('/:id', [auth, upload.single('coverImage')], async (req, res) => {
 
         let coverImageUrl = req.body.coverImage;
         if (req.file) {
-            coverImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+            // Delete old cover if it was a GridFS ID
+            if (story.coverImage && story.coverImage.includes('/api/images/')) {
+                const oldId = story.coverImage.split('/').pop();
+                await deleteFromGridFS(oldId);
+            }
+
+            const imageId = await uploadToGridFS(req.file.buffer, req.file);
+            coverImageUrl = `${req.protocol}://${req.get('host')}/api/images/${imageId}`;
         }
 
         if (title) story.title = title;

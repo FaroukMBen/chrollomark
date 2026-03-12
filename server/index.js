@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-const connectDB = require('./config/db');
+const { connectDB } = require('./config/db');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -15,6 +15,7 @@ const socialRoutes = require('./routes/social');
 const mangadexRoutes = require('./routes/mangadex');
 const supportRoutes = require('./routes/support');
 const devlogRoutes = require('./routes/devlog');
+const imageRoutes = require('./routes/images');
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/social', socialRoutes);
 app.use('/api/mangadex', mangadexRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/devlog', devlogRoutes);
+app.use('/api/images', imageRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

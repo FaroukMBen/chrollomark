@@ -31,6 +31,7 @@ export default function UserProfileScreen() {
   const [mutualFriends, setMutualFriends] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'progress' | 'collections' | 'mutual'>('progress');
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'compact'>('list');
   const [isConfirmVisible, setIsConfirmVisible] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
@@ -242,35 +243,124 @@ export default function UserProfileScreen() {
         <View style={styles.content}>
           {activeTab === 'progress' && (
             profile.isFriend ? (
-              progress.length === 0 ? (
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  No reading progress to show
-                </Text>
-              ) : (
-                progress.map((item: any) => (
-                  <TouchableOpacity
-                    key={item._id}
-                    style={[styles.progressItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-                    onPress={() => router.push(`/story/${item.story._id}` as any)}>
-                    {item.story.coverImage ? (
-                      <Image source={{ uri: item.story.coverImage }} style={styles.progressCover} contentFit="cover" />
-                    ) : (
-                      <View style={[styles.progressCover, styles.placeholderCover, { backgroundColor: colors.surfaceElevated }]}>
-                        <IconSymbol name="book.fill" size={24} color={colors.textSecondary} />
-                      </View>
-                    )}
-                    <View style={styles.progressInfo}>
-                      <Text style={[styles.progressTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
-                      <View style={styles.progressMeta}>
-                        <View style={[styles.statusBadge, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
-                          <Text style={[styles.statusText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
+              <View>
+                <View style={styles.sectionTabHeader}>
+                  <Text style={[styles.sectionTitleSmall, { color: colors.textSecondary }]}>
+                    {progress.length} {progress.length === 1 ? 'Title' : 'Titles'}
+                  </Text>
+                  <View style={[styles.viewToggle, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                    {[
+                      { mode: 'list', icon: 'list.bullet' as const },
+                      { mode: 'grid', icon: 'square.grid.2x2.fill' as const },
+                      { mode: 'compact', icon: 'square.grid.3x3.fill' as const }
+                    ].map((item) => (
+                      <TouchableOpacity
+                        key={item.mode}
+                        style={[styles.toggleBtn, viewMode === item.mode && { backgroundColor: colors.surface }]}
+                        onPress={() => setViewMode(item.mode as any)}>
+                        <IconSymbol 
+                          name={item.icon} 
+                          size={16} 
+                          color={viewMode === item.mode ? colors.primary : colors.textSecondary} 
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {progress.length === 0 ? (
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    No reading progress to show
+                  </Text>
+                ) : (
+                  <View style={viewMode === 'grid' ? styles.gridContainer : viewMode === 'compact' ? styles.compactGrid : null}>
+                    {progress.map((item: any) => (
+                      <TouchableOpacity
+                        key={item._id}
+                        style={[
+                          viewMode === 'list' && [styles.progressItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
+                          viewMode === 'grid' && [styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
+                          viewMode === 'compact' && styles.compactCard
+                        ]}
+                        onPress={() => router.push(`/story/${item.story._id}` as any)}>
+                        
+                        {/* Cover Image */}
+                        <View>
+                          {item.story.coverImage ? (
+                            <Image 
+                              source={{ uri: item.story.coverImage }} 
+                              style={[
+                                viewMode === 'list' && styles.listProgressCover,
+                                viewMode === 'grid' && styles.gridCover,
+                                viewMode === 'compact' && styles.compactCover,
+                                { borderColor: colors.cardBorder }
+                              ]} 
+                              contentFit="cover" 
+                            />
+                          ) : (
+                            <View style={[
+                              viewMode === 'list' && styles.listProgressCover,
+                              viewMode === 'grid' && styles.gridCover,
+                              viewMode === 'compact' && styles.compactCover,
+                              styles.placeholderCover, 
+                              { backgroundColor: colors.surfaceElevated }
+                            ]}>
+                              <IconSymbol name="book.fill" size={viewMode === 'compact' ? 20 : 24} color={colors.textSecondary} />
+                            </View>
+                          )}
+                          
+                          {/* Mutual Badge */}
+                          {item.isMutual && (
+                            <View style={[
+                              styles.mutualBadge, 
+                              { backgroundColor: colors.primary },
+                              viewMode === 'compact' && styles.mutualBadgeMini
+                            ]}>
+                              <IconSymbol name="person.2.fill" size={viewMode === 'compact' ? 8 : 10} color="#FFF" />
+                            </View>
+                          )}
                         </View>
-                        <Text style={[styles.chapterText, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              )
+
+                        {/* Info Section */}
+                        {viewMode === 'list' && (
+                          <View style={styles.progressInfo}>
+                            <View style={styles.titleRow}>
+                              <Text style={[styles.progressTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
+                              {item.isMutual && (
+                                <View style={[styles.mutualTag, { backgroundColor: colors.primary + '15' }]}>
+                                  <Text style={[styles.mutualTagText, { color: colors.primary }]}>Mutual</Text>
+                                </View>
+                              )}
+                            </View>
+                            <View style={styles.progressMeta}>
+                              <View style={[styles.statusBadge, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
+                                <Text style={[styles.statusText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
+                              </View>
+                              <Text style={[styles.chapterText, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
+                            </View>
+                          </View>
+                        )}
+                        
+                        {viewMode === 'grid' && (
+                          <View style={styles.gridInfo}>
+                            <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
+                            <View style={styles.gridMeta}>
+                              <View style={[styles.miniStatusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
+                              <Text style={[styles.gridChapter, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {viewMode === 'compact' && (
+                          <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
+                            {item.story.title}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
             ) : (
               <View style={styles.locked}>
                 <IconSymbol name="lock.fill" size={32} color={colors.textSecondary} />
@@ -399,15 +489,54 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.lg },
   locked: { alignItems: 'center', paddingTop: 60, gap: Spacing.md },
   lockedText: { fontSize: 14, textAlign: 'center', fontWeight: '500' },
+  sectionTabHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+  sectionTitleSmall: { fontSize: 13, fontWeight: '700' },
+  viewToggle: { flexDirection: 'row', borderRadius: BorderRadius.lg, padding: 3, borderWidth: 1 },
+  toggleBtn: { width: 32, height: 32, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   progressItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.sm, borderRadius: BorderRadius.lg, marginBottom: Spacing.sm, borderWidth: 1 },
-  progressCover: { width: 50, height: 70, borderRadius: BorderRadius.sm },
+  listProgressCover: { width: 50, height: 70, borderRadius: BorderRadius.sm },
   placeholderCover: { justifyContent: 'center', alignItems: 'center' },
   progressInfo: { flex: 1, marginLeft: Spacing.md },
-  progressTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  progressTitle: { fontSize: 14, fontWeight: '700', flex: 1 },
+  mutualTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: BorderRadius.full },
+  mutualTagText: { fontSize: 9, fontWeight: '800' },
   progressMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.full },
   statusText: { fontSize: 10, fontWeight: '800' },
   chapterText: { fontSize: 12, fontWeight: '800' },
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gridCard: { width: '48%', borderRadius: BorderRadius.lg, borderWidth: 1, overflow: 'hidden', marginBottom: Spacing.md },
+  gridCover: { width: '100%', height: 180 },
+  gridInfo: { padding: Spacing.sm },
+  gridTitle: { fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  gridMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  miniStatusDot: { width: 8, height: 8, borderRadius: 4 },
+  gridChapter: { fontSize: 11, fontWeight: '800' },
+  compactGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  compactCard: { width: '31%', marginBottom: Spacing.sm },
+  compactCover: { width: '100%', height: 140, borderRadius: BorderRadius.md, borderWidth: 1 },
+  compactTitle: { fontSize: 10, fontWeight: '600', marginTop: 4, textAlign: 'center' },
+  mutualBadge: { 
+    position: 'absolute', 
+    top: 6, 
+    right: 6, 
+    width: 20, 
+    height: 20, 
+    borderRadius: 10, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  mutualBadgeMini: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    top: 4,
+    right: 4,
+    borderWidth: 1.5,
+  },
   collectionItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.lg, marginBottom: Spacing.sm, borderWidth: 1 },
   collectionColor: { width: 6, height: 36, borderRadius: 3, marginRight: Spacing.md },
   collectionInfo: { flex: 1 },

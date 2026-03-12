@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { uploadToGridFS, deleteFromGridFS } = require('../utils/imageHandler');
 
 const router = express.Router();
 
@@ -103,7 +104,15 @@ router.put('/profile', [auth, upload.single('avatar')], async (req, res) => {
 
         let avatarUrl = req.body.avatar;
         if (req.file) {
-            avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+            // Delete old avatar if it was a GridFS ID
+            const currentUser = await User.findById(req.user._id);
+            if (currentUser.avatar && currentUser.avatar.includes('/api/images/')) {
+                const oldId = currentUser.avatar.split('/').pop();
+                await deleteFromGridFS(oldId);
+            }
+
+            const imageId = await uploadToGridFS(req.file.buffer, req.file);
+            avatarUrl = `${req.protocol}://${req.get('host')}/api/images/${imageId}`;
         }
 
         if (username) {

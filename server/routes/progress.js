@@ -204,9 +204,18 @@ router.get('/user/:userId', auth, async (req, res) => {
 
         const progress = await ReadingProgress.find({ user: req.params.userId })
             .sort('-lastReadDate')
-            .populate('story', 'title coverImage type totalChapters author');
+            .populate('story', 'title coverImage type totalChapters author status averageRating genres');
 
-        res.json(progress);
+        // Check which ones are mutual
+        const myProgress = await ReadingProgress.find({ user: req.user._id }).select('story');
+        const myStoryIds = new Set(myProgress.map(p => p.story.toString()));
+
+        const progressWithMutual = progress.map(p => ({
+            ...p.toObject(),
+            isMutual: p.story ? myStoryIds.has(p.story._id.toString()) : false
+        }));
+
+        res.json(progressWithMutual);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
