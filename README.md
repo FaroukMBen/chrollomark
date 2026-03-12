@@ -1,50 +1,89 @@
-# Welcome to your Expo app 👋
+# ChrolloMark v2.0.0
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+[![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev)
+[![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactnative.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 
-## Get started
+**ChrolloMark** is the ultimate community-driven story tracker. Track your manga, webtoons, and comics, discover trending masterpieces through a weighted engagement engine, and sync progress in real-time with your friends.
 
-1. Install dependencies
+---
 
+## ✨ What's New in v2.0.0
+
+### 🎨 Immersive Experience
+- **Total Home Rework**: A brand new "Hero" section for your active reading with localized greetings and premium glassmorphism stats.
+- **Trending Feed**: Dynamic horizontal lists powered by our community engagement algorithm.
+- **Global Search**: Instantly find stories and collections with optimized indexing.
+
+### 🔥 Popularity Engine (Engagement v2)
+The discovery algorithm now weights community efforts:
+- **Views**: +2 pts
+- **Likes**: +3 pts (Sentiment control)
+- **Library/Collections**: +3 to +5 pts
+- **Reviews**: Star-weighted scoring from -2 to +6 pts.
+
+### 🤝 Real-Time Social
+- **Socket.io Integration**: Live synchronization of friend feeds and progress.
+- **Mutual Stories**: Explore shared interests on friend profiles.
+- **Public Profiles**: Showcase your library and collections to the world.
+
+### ⚙️ Technical & Performance
+- **GridFS Migration**: Scalable image storage for high-resolution covers and avatars.
+- **Admin Hub**: Centralized dashboard for managing reports and feedback.
+- **Multi-Platform Polish**: Full UI/UX audit for Android navigation and keyboard accessibility.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js (v18+)
+- MongoDB (Atlas or local)
+- Expo Go (for mobile testing)
+
+### Installation
+
+1. **Clone and Install**
    ```bash
+   git clone https://github.com/FaroukMBen/chrollomark.git
+   cd chrollomark
    npm install
    ```
 
-2. Start the app
-
+2. **Server Setup**
    ```bash
+   cd server
+   npm install
+   # Create a .env file with MONGODB_URI and JWT_SECRET
+   npm run dev
+   ```
+
+3. **Client Setup**
+   ```bash
+   # Back in root
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+---
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 🛠️ Tech Stack
+- **Frontend**: React Native, Expo, Expo Router
+- **Backend**: Node.js, Express, Socket.io
+- **Database**: MongoDB (Mongoose), GridFS for media
+- **State**: React Context API, AsyncStorage
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## 📦 Releases
 
-When you're ready, run:
+- **[v2.0.0 (Latest Release)](https://github.com/FaroukMBen/chrollomark/releases/latest)** — The Social Discovery Update.
+- **[v1.5.0](https://github.com/FaroukMBen/chrollomark/releases/tag/v1.5)** — Performance & UI Polish.
 
-```bash
-npm run reset-project
-```
+---
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 🤝 Contributing
+Contributions are welcome! Please open an issue or submit a pull request for any bugs or feature requests.
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 📄 License
+This project is licensed under the MIT License.
