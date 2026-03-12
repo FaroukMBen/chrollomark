@@ -163,7 +163,7 @@ export default function SocialScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.center}>
           <IconSymbol name="person.2.fill" size={48} color={colors.textSecondary} />
           <Text style={[styles.emptyText, { color: colors.textSecondary, marginTop: Spacing.md }]}>
@@ -361,7 +361,7 @@ export default function SocialScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.fixedHeader}>
         <View style={styles.header}>
           <Text style={[styles.pageTitle, { color: colors.text }]}>Social</Text>

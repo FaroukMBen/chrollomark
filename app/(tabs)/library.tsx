@@ -215,7 +215,7 @@ export default function LibraryScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.center}>
           <IconSymbol name="book.fill" size={48} color={colors.textSecondary} />
           <Text style={[styles.emptyText, { color: colors.textSecondary, marginTop: Spacing.md }]}>Sign in to view your library</Text>
@@ -225,7 +225,7 @@ export default function LibraryScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: colors.text }]}>My Library</Text>
@@ -341,9 +341,9 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, fontWeight: '500', marginTop: 2 },
   addBtn: { width: 40, height: 40, borderRadius: BorderRadius.full, justifyContent: 'center', alignItems: 'center', ...Shadows.sm },
   tabContainer: { borderBottomWidth: 1, marginBottom: Spacing.xs },
-  tabContent: { paddingHorizontal: Spacing.lg, flexDirection: 'row' },
-  tabItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 4, marginRight: 32, borderBottomWidth: 3, borderBottomColor: 'transparent', gap: 10 },
-  tabText: { fontSize: 15, fontWeight: '600' },
+  tabContent: { paddingHorizontal: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
+  tabItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 3, borderBottomColor: 'transparent', gap: 8 },
+  tabText: { fontSize: 14, fontWeight: '700' },
   filterWrapper: { paddingVertical: Spacing.sm },
   filterContent: { paddingHorizontal: Spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 10 },
   filterChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: BorderRadius.full, borderWidth: 1, gap: 8 },

@@ -249,7 +249,7 @@ export default function ExploreScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.center}>
           <IconSymbol name="magnifyingglass" size={48} color={colors.textSecondary} />
           <Text style={[styles.emptyText, { color: colors.textSecondary, marginTop: Spacing.md }]}>
@@ -363,7 +363,7 @@ export default function ExploreScreen() {
   const totalCount = source === 'local' ? localTotal : mdTotal;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ──── HEADER (outside FlatList so keyboard persists) ──── */}
       <View style={styles.fixedHeader}>
         <View style={styles.header}>
