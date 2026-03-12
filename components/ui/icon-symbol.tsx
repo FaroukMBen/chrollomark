@@ -35,7 +35,7 @@ const MAPPING = {
   'minus': 'remove',
   'checkmark': 'check',
   'checkmark.circle.fill': 'check-circle',
-
+ 
   // Books & Content
   'book.fill': 'menu-book',
   'book': 'menu-book',
@@ -123,7 +123,14 @@ const MAPPING = {
   // List  
   'list.bullet': 'format-list-bulleted',
   'line.3.horizontal.decrease': 'filter-list',
-  'textformat.abc': 'sort-by-alpha',
+  'textformat.abc': 'sort',
+  'calendar': 'event',
+  'calendar.badge.clock': 'schedule',
+  'abc': 'sort',
+  'arrow.down.to.line': 'vertical-align-bottom',
+  'arrow.up.to.line': 'vertical-align-top',
+  'sort.ascending': 'sort',
+  'sort.descending': 'sort',
   'minus.circle.fill': 'remove-circle',
   'terminal.fill': 'terminal',
   'list.bullet.rectangle.portrait': 'feed',

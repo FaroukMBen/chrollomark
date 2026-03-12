@@ -27,6 +27,7 @@ export default function LibraryScreen() {
 
   const [progress, setProgress] = useState<any[]>([]);
   const [collections, setCollections] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeSection, setActiveSection] = useState<'Stories' | 'Collections' | 'Favorites'>('Stories');
@@ -34,6 +35,7 @@ export default function LibraryScreen() {
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'compact'>('list');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const [librarySearchQuery, setLibrarySearchQuery] = useState('');
 
   const loadData = useCallback(async () => {
@@ -48,8 +50,13 @@ export default function LibraryScreen() {
         if (activeSection === 'Favorites') params.favorite = 'true';
         if (statusFilter !== 'All') params.status = statusFilter;
         
-        const progressData = await api.getMyProgress(Object.keys(params).length > 0 ? params : undefined);
+        const [progressData, statsData] = await Promise.all([
+          api.getMyProgress(Object.keys(params).length > 0 ? params : undefined),
+          api.getProgressStats()
+        ]);
+        
         setProgress(progressData);
+        setStats(statsData);
         setCollections([]);
       }
     } catch (error) {
@@ -107,39 +114,76 @@ export default function LibraryScreen() {
 
   const getSortIcon = () => {
     switch (sortBy) {
-      case 'az': return 'textformat.abc';
-      case 'za': return 'textformat.abc';
+      case 'az': 
+      case 'za': return 'abc';
       case 'newest': return 'arrow.down';
       case 'oldest': return 'arrow.up';
     }
   };
 
-  const getSectionIcon = (section: string) => {
-    const iconsCustom: Record<string, string> = {
-      'Stories': 'books.vertical.fill',
-      'Collections': 'folder.fill',
-      'Favorites': 'heart.fill',
-    };
-    return iconsCustom[section] || 'book.fill';
+  const getSortLabel = () => {
+    switch (sortBy) {
+      case 'az': return 'A-Z';
+      case 'za': return 'Z-A';
+      case 'newest': return 'Newest';
+      case 'oldest': return 'Oldest';
+      default: return '';
+    }
   };
 
-  const getFilterIcon = (filter: string) => {
-    const icons: Record<string, string> = {
-      'All': 'books.vertical.fill',
-      'Reading': 'book.fill',
-      'Completed': 'checkmark.circle.fill',
-      'Plan to Read': 'bookmark.fill',
-      'On Hold': 'pause.circle.fill',
-      'Dropped': 'xmark.circle.fill',
-    };
-    return icons[filter] || 'book.fill';
+  const handleStatusFilterToggle = (filter: string) => {
+    // If clicking the current filter, or clicking "All" when it's already active, keep/reset to "All"
+    if (statusFilter === filter) {
+      if (filter === 'All') return; // Already on All
+      setStatusFilter('All');
+    } else {
+      setStatusFilter(filter);
+    }
+    setIsLoading(true);
   };
+
+  const SECTION_COLORS: Record<string, string> = {
+    Favorites: '#EF4444',
+    Collections: '#F59E0B',
+  };
+
+  const SECTION_ICONS: Record<string, string> = {
+    Stories: 'books.vertical.fill',
+    Collections: 'folder.fill',
+    Favorites: 'heart.fill',
+  };
+
+  const getStatusCount = (status: string) => {
+    if (!stats) return 0;
+    const countMap: Record<string, number> = {
+      'All': stats.totalStories || 0,
+      'Reading': stats.reading || 0,
+      'Completed': stats.completed || 0,
+      'Plan to Read': stats.planToRead || 0,
+      'On Hold': stats.onHold || 0,
+      'Dropped': stats.dropped || 0,
+    };
+    return countMap[status] ?? 0;
+  };
+
+  const getSectionCount = (section: string) => {
+    if (section === 'Stories') return stats?.totalStories || 0;
+    if (section === 'Collections') return collections.length;
+    if (section === 'Favorites') return stats?.favorites || 0;
+    return 0;
+  };
+
 
   const renderCollectionCard = (coll: any) => (
     <TouchableOpacity
       key={coll._id}
       style={[styles.fullCollCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-      onPress={() => router.push(`/collection/${coll._id}` as any)}>
+      onPress={() => router.push(`/collection/${coll._id}` as any)}
+      activeOpacity={0.8}>
+      
+      {/* Dynamic Theme Accent */}
+      <View style={[styles.collThemeBar, { backgroundColor: coll.color || colors.primary }]} />
+
       <View style={[styles.collPreviewContainer, { backgroundColor: colors.surfaceElevated }]}>
         {coll.stories && coll.stories.length > 0 ? (
           <View style={styles.previewGrid}>
@@ -157,24 +201,25 @@ export default function LibraryScreen() {
               />
             ))}
             {coll.stories.length > 4 && (
-              <View style={styles.previewMoreOverlay}>
+              <View style={[styles.previewMoreOverlay, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
                 <Text style={styles.previewMoreText}>+{coll.stories.length - 4}</Text>
               </View>
             )}
           </View>
         ) : (
           <View style={styles.previewEmpty}>
-            <IconSymbol name="folder.fill" size={32} color={colors.textSecondary} />
-            <View style={[styles.collStripe, { backgroundColor: coll.color || colors.primary, width: 30, marginTop: 12 }]} />
+            <View style={[styles.emptyCollIcon, { backgroundColor: (coll.color || colors.primary) + '15' }]}>
+              <IconSymbol name="folder.fill" size={32} color={coll.color || colors.primary} />
+            </View>
           </View>
         )}
       </View>
+
       <View style={styles.collDetails}>
         <Text style={[styles.collName, { color: colors.text }]} numberOfLines={1}>{coll.name}</Text>
         <View style={styles.collMetaRow}>
-          <IconSymbol name="books.vertical.fill" size={12} color={colors.textSecondary} />
-          <Text style={[styles.collCount, { color: colors.textSecondary, marginLeft: 4 }]}>
-            {coll.stories?.length || 0} titles
+          <Text style={[styles.collCount, { color: colors.textSecondary }]}>
+            {coll.stories?.length || 0} {coll.stories?.length === 1 ? 'title' : 'titles'}
           </Text>
         </View>
       </View>
@@ -264,16 +309,215 @@ export default function LibraryScreen() {
     );
   };
 
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.center}>
-          <IconSymbol name="book.fill" size={48} color={colors.textSecondary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary, marginTop: Spacing.md }]}>Sign in to view your library</Text>
+  const renderEmptyState = (type: 'Stories' | 'Collections') => {
+    const isSearch = librarySearchQuery.trim().length > 0;
+    
+    if (type === 'Collections') {
+      const collTitle = isSearch ? "No results found" : "No collections yet";
+      const collSub = isSearch ? `No collection matches "${librarySearchQuery}"` : "Create collections to organize your stories";
+      
+      return (
+        <View style={styles.emptyCenter}>
+          <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
+            <IconSymbol name="folder.fill" size={40} color={colors.textSecondary} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{collTitle}</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{collSub}</Text>
         </View>
-      </SafeAreaView>
+      );
+    }
+
+    const isAll = statusFilter === 'All';
+    let title = '';
+    let subtitle = '';
+
+    if (isSearch) {
+      title = "No results found";
+      subtitle = `No stories match "${librarySearchQuery}"`;
+    } else if (isAll) {
+      title = 'Library is empty';
+      subtitle = 'Start by exploring and adding stories';
+    } else {
+      title = `No titles in "${statusFilter}"`;
+      subtitle = `You don't have any stories with "${statusFilter}" status`;
+    }
+
+    return (
+      <View style={styles.emptyCenter}>
+        <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
+          <IconSymbol name="books.vertical.fill" size={40} color={colors.textSecondary} />
+        </View>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{subtitle}</Text>
+      </View>
     );
-  }
+  };
+
+  const renderStoriesContent = () => {
+    if (progress.length === 0) return renderEmptyState('Stories');
+    
+    return (
+      <View style={[styles.storiesScrollSection, viewMode !== 'list' && styles.gridContainer]}>
+        {sortedProgress.map(renderStoryItem)}
+      </View>
+    );
+  };
+
+  const renderPinnedToolbar = () => {
+    if (activeSection === 'Collections') return null;
+
+    return (
+      <View style={[styles.pinnedToolbar, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+        <View style={styles.pinnedHeaderLeft}>
+          <TouchableOpacity 
+            style={[
+              styles.filterActionButtonCompact, 
+              { backgroundColor: colors.surfaceElevated },
+              isFiltersExpanded && { borderColor: colors.primary, borderWidth: 1, backgroundColor: colors.primary + '10' }
+            ]} 
+            onPress={() => setIsFiltersExpanded(!isFiltersExpanded)}
+            activeOpacity={0.6}
+          >
+            <IconSymbol 
+              name="line.3.horizontal.decrease" 
+              size={14} 
+              color={isFiltersExpanded ? colors.primary : colors.text} 
+            />
+            <Text style={[styles.filterActionText, { color: isFiltersExpanded ? colors.primary : colors.text }]}>Filters</Text>
+          </TouchableOpacity>
+          
+          <View style={[styles.pinnedCountBadge, { backgroundColor: colors.primary + '10' }]}>
+            <Text style={[styles.pinnedCountText, { color: colors.primary }]}>{sortedProgress.length}</Text>
+          </View>
+        </View>
+
+        <View style={styles.toolbarActions}>
+          <TouchableOpacity style={[styles.miniSortAction, { backgroundColor: colors.surfaceElevated }]} onPress={toggleSort}>
+            <IconSymbol 
+              name={getSortIcon() as any} 
+              size={14} 
+              color={colors.primary} 
+              style={sortBy === 'za' ? { transform: [{ rotate: '180deg' }] } : undefined} 
+            />
+          </TouchableOpacity>
+          
+          <View style={[styles.viewTogglePinned, { backgroundColor: colors.surfaceElevated }]}>
+            {(['list', 'grid', 'compact'] as const).map(mode => {
+              const isModeActive = viewMode === mode;
+              const modeIcons = { list: 'list.bullet', grid: 'square.grid.2x2.fill', compact: 'square.grid.3x3.fill' };
+              
+              return (
+                <TouchableOpacity 
+                  key={mode} 
+                  onPress={() => setViewMode(mode)} 
+                  style={[styles.toggleBtnPinned, isModeActive && { backgroundColor: colors.primary }]}
+                >
+                  <IconSymbol 
+                    name={modeIcons[mode] as any} 
+                    size={14} 
+                    color={isModeActive ? '#FFF' : colors.textSecondary} 
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderFilterGrid = () => {
+    if (activeSection === 'Collections' || !isFiltersExpanded) return null;
+
+    return (
+      <View style={[styles.filterPanelFull, { backgroundColor: colors.surface + '60', borderBottomColor: colors.border }]}>
+        <View style={styles.filterSection}>
+          <View style={styles.filterPanelHeader}>
+            <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>STORY STATUS</Text>
+          </View>
+          
+          <View style={styles.filterGridContainer}>
+            {['All', ...ReadingStatuses].map((filter) => {
+              const isActive = statusFilter === filter;
+              const isDropped = filter === 'Dropped';
+              
+              let filterColor = colors.primary;
+              if (isDropped) {
+                filterColor = '#EF4444';
+              } else if (filter !== 'All' && StatusColors[filter]) {
+                filterColor = StatusColors[filter];
+              }
+
+              const textColor = isActive ? filterColor : (isDropped ? '#EF444490' : colors.text);
+              const countColor = isActive ? filterColor : (isDropped ? '#EF444460' : colors.textSecondary);
+              const currentCount = getStatusCount(filter);
+
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  style={[
+                    styles.filterChipPremium,
+                    { backgroundColor: colors.surfaceElevated },
+                    isActive && { backgroundColor: filterColor + '15', borderColor: filterColor, borderWidth: 1 }
+                  ]}
+                  onPress={() => handleStatusFilterToggle(filter)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.filterChipMain}>
+                    {isDropped ? (
+                      <IconSymbol name="trash" size={10} color={isActive ? '#EF4444' : '#EF444490'} />
+                    ) : (
+                      <View style={[styles.statusDotPremium, { backgroundColor: filterColor }]} />
+                    )}
+                    <Text style={[styles.filterChipText, { color: textColor }]}>{filter}</Text>
+                  </View>
+                  {currentCount > 0 && (
+                    <View style={[styles.filterChipBadge, { backgroundColor: isActive ? filterColor + '20' : colors.background }]}>
+                      <Text style={[styles.filterChipCount, { color: countColor }]}>{currentCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={[styles.filterSection, { marginTop: Spacing.xl }]}>
+          <View style={styles.filterPanelHeader}>
+            <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>SORT ORDER</Text>
+          </View>
+          <View style={styles.sortGridContainer}>
+            {(['newest', 'oldest', 'az', 'za'] as const).map((option) => {
+              const isActive = sortBy === option;
+              const labels = { newest: 'Newest', oldest: 'Oldest', az: 'A-Z', za: 'Z-A' };
+              const icons = { newest: 'arrow.down', oldest: 'arrow.up', az: 'abc', za: 'textformat.abc' };
+              
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.sortTilePremium,
+                    { backgroundColor: colors.surfaceElevated },
+                    isActive && { backgroundColor: colors.primary, borderColor: colors.primary }
+                  ]}
+                  onPress={() => setSortBy(option)}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol 
+                    name={icons[option] as any} 
+                    size={14} 
+                    color={isActive ? '#FFF' : colors.textSecondary} 
+                    style={option === 'za' ? { transform: [{ rotate: '180deg' }] } : undefined}
+                  />
+                  <Text style={[styles.sortTileText, { color: isActive ? '#FFF' : colors.text }]}>{labels[option]}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -315,41 +559,26 @@ export default function LibraryScreen() {
         <View style={styles.tabContent}>
           {['Stories', 'Collections', 'Favorites'].map((section) => {
             const isActive = activeSection === section;
-            let activeColor = colors.primary;
-            if (section === 'Favorites') activeColor = '#EF4444';
-            if (section === 'Collections') activeColor = '#F59E0B';
+            const activeColor = SECTION_COLORS[section] || colors.primary;
+            const count = getSectionCount(section);
+            const iconName = SECTION_ICONS[section] || 'book.fill';
+
             return (
               <TouchableOpacity
                 key={section}
                 style={[styles.tabItem, isActive && { borderBottomColor: activeColor }]}
                 onPress={() => { setActiveSection(section as any); setIsLoading(true); }}>
-                <IconSymbol name={getSectionIcon(section) as any} size={16} color={isActive ? activeColor : colors.textSecondary} />
-                <Text style={[styles.tabText, { color: isActive ? colors.text : colors.textSecondary }, isActive && { fontWeight: '700' }]}>{section}</Text>
+                <View style={styles.tabItemWithBadge}>
+                  <IconSymbol name={iconName as any} size={16} color={isActive ? activeColor : colors.textSecondary} />
+                  <Text style={[styles.tabText, { color: isActive ? colors.text : colors.textSecondary }, isActive && { fontWeight: '700' }]}>{section}</Text>
+                </View>
               </TouchableOpacity>
             );
           })}
         </View>
       </View>
 
-      {activeSection !== 'Collections' && (
-        <View style={styles.filterWrapper}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-            {['All', ...ReadingStatuses].map((filter) => {
-              const isActive = statusFilter === filter;
-              const filterColor = filter === 'All' ? colors.primary : (StatusColors[filter] || colors.primary);
-              return (
-                <TouchableOpacity
-                  key={filter}
-                  style={[styles.filterChip, { backgroundColor: isActive ? filterColor + '15' : 'transparent', borderColor: isActive ? filterColor : colors.border }]}
-                  onPress={() => { setStatusFilter(filter); setIsLoading(true); }}>
-                  {filter !== 'All' && <View style={[styles.filterDot, { backgroundColor: StatusColors[filter] || colors.primary }]} />}
-                  <Text style={[styles.filterText, { color: isActive ? filterColor : colors.textSecondary }]}>{filter}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
+      {renderPinnedToolbar()}
 
       {isLoading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
@@ -361,22 +590,16 @@ export default function LibraryScreen() {
                 <View style={styles.collectionTitleRow}>
                   <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 }]}>My Collections</Text>
                 </View>
-                <TouchableOpacity style={[styles.newCollBtn, { backgroundColor: colors.primary + '15' }]} onPress={() => router.push('/collection/create')}>
-                  <IconSymbol name="plus" size={14} color={colors.primary} />
-                  <Text style={[styles.newCollText, { color: colors.primary, fontSize: 13 }]}>New Collection</Text>
+                <TouchableOpacity 
+                  style={[styles.newCollBtnPremium, { backgroundColor: colors.primary }]} 
+                  onPress={() => router.push('/collection/create')}
+                  activeOpacity={0.8}
+                >
+                  <IconSymbol name="plus" size={14} color="#FFF" />
+                  <Text style={styles.newCollTextPremium}>New Collection</Text>
                 </TouchableOpacity>
               </View>
-              {filteredCollections.length === 0 ? (
-                <View style={styles.emptyCenter}>
-                  <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}><IconSymbol name="folder.fill" size={40} color={colors.textSecondary} /></View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                    {librarySearchQuery ? "No results found" : "No collections yet"}
-                  </Text>
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    {librarySearchQuery ? `No collection matches "${librarySearchQuery}"` : "Create collections to organize your favorite stories"}
-                  </Text>
-                </View>
-              ) : (
+              {filteredCollections.length === 0 ? renderEmptyState('Collections') : (
                 <View style={[styles.gridContainer, { marginTop: Spacing.md }]}>
                   {filteredCollections.map(renderCollectionCard)}
                 </View>
@@ -384,39 +607,8 @@ export default function LibraryScreen() {
             </View>
           ) : (
             <>
-              <View style={styles.sectionHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>{statusFilter === 'All' ? activeSection : statusFilter}</Text>
-                  <TouchableOpacity style={styles.sortBtn} onPress={toggleSort}>
-                    <IconSymbol name={getSortIcon() as any} size={14} color={colors.primary} />
-                    <Text style={[styles.sortText, { color: colors.primary }]}>
-                      {sortBy === 'az' ? 'A-Z' : sortBy === 'za' ? 'Z-A' : sortBy.charAt(0).toUpperCase() + sortBy.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={[styles.viewToggle, { backgroundColor: colors.surfaceElevated }]}>
-                  {(['list', 'grid', 'compact'] as const).map(mode => (
-                    <TouchableOpacity key={mode} onPress={() => setViewMode(mode)} style={[styles.toggleBtn, viewMode === mode && { backgroundColor: colors.primary }]}>
-                      <IconSymbol name={mode === 'list' ? 'list.bullet' : mode === 'grid' ? 'square.grid.2x2.fill' : 'square.grid.3x3.fill'} size={16} color={viewMode === mode ? '#FFF' : colors.textSecondary} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              {progress.length === 0 ? (
-                <View style={styles.emptyCenter}>
-                  <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}><IconSymbol name="books.vertical.fill" size={40} color={colors.textSecondary} /></View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                    {librarySearchQuery ? "No results found" : (statusFilter === 'All' ? 'Library is empty' : `No "${statusFilter}" titles`)}
-                  </Text>
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    {librarySearchQuery ? `No stories match "${librarySearchQuery}"` : (statusFilter === 'All' ? 'Start by exploring and adding stories to your library' : `You don't have any stories with "${statusFilter}" status`)}
-                  </Text>
-                </View>
-              ) : (
-                <View style={viewMode !== 'list' && styles.gridContainer}>
-                  {sortedProgress.map(renderStoryItem)}
-                </View>
-              )}
+              {renderFilterGrid()}
+              {renderStoriesContent()}
             </>
           )}
         </ScrollView>
@@ -438,31 +630,125 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14, fontWeight: '700' },
   filterWrapper: { paddingVertical: Spacing.sm },
   filterContent: { paddingHorizontal: Spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  filterChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: BorderRadius.full, borderWidth: 1, gap: 8 },
-  filterDot: { width: 8, height: 8, borderRadius: 4 },
-  filterText: { fontSize: 13, fontWeight: '600' },
-  collectionsFullSection: { paddingBottom: 20, paddingTop: Spacing.sm },
+  pinnedToolbar: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: Spacing.lg, 
+    paddingVertical: 12, 
+    borderBottomWidth: 1,
+    zIndex: 10
+  },
+  pinnedHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  pinnedCountBadge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
+  pinnedCountText: { fontSize: 10, fontWeight: '800' },
+  toolbarActions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  miniSortAction: { width: 32, height: 32, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
+  filterActionButtonCompact: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    paddingHorizontal: 10, 
+    paddingVertical: 6, 
+    borderRadius: BorderRadius.md,
+    ...Shadows.sm
+  },
+  filterActionText: { fontSize: 13, fontWeight: '700' },
+  viewTogglePinned: { flexDirection: 'row', borderRadius: BorderRadius.md, padding: 2 },
+  toggleBtnPinned: { width: 30, height: 30, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
+  
+  filterPanelFull: { 
+    paddingTop: Spacing.lg, 
+    paddingBottom: Spacing.xl + 10,
+    borderBottomWidth: 1,
+    zIndex: 5,
+    width: '100%'
+  },
+  filterSection: { width: '100%' },
+  filterPanelHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md
+  },
+  filterPanelLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+  filterCloseText: { fontSize: 12, fontWeight: '700' },
+  filterGridContainer: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: 8, 
+    paddingHorizontal: Spacing.lg
+  },
+  filterChipPremium: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    paddingLeft: 10, 
+    paddingRight: 6,
+    paddingVertical: 10, 
+    borderRadius: BorderRadius.md, 
+    minWidth: '31%',
+    flexGrow: 1,
+    ...Shadows.sm
+  },
+  sortTilePremium: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6,
+    paddingHorizontal: 10, 
+    paddingVertical: 8, 
+    borderRadius: BorderRadius.md, 
+    flex: 1,
+    justifyContent: 'center',
+    ...Shadows.sm
+  },
+  sortTileText: { fontSize: 11, fontWeight: '800' },
+  sortGridContainer: { 
+    flexDirection: 'row', 
+    gap: 8, 
+    paddingHorizontal: Spacing.lg
+  },
+  filterChipMain: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDotPremium: { width: 6, height: 6, borderRadius: 3 },
+  filterChipText: { fontSize: 12, fontWeight: '700' },
+  filterChipBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  filterChipCount: { fontSize: 10, fontWeight: '800' },
+  tabItemWithBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: BorderRadius.full },
+  tabBadgeText: { fontSize: 10, fontWeight: '700' },
+  collectionsFullSection: { paddingHorizontal: Spacing.lg, paddingBottom: 20, paddingTop: Spacing.sm },
   collectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   collectionTitleRow: { flexDirection: 'row', alignItems: 'center' },
   sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
-  newCollBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: BorderRadius.full },
-  newCollText: { fontSize: 11, fontWeight: '700' },
-  fullCollCard: { width: '48%', borderRadius: BorderRadius.lg, borderWidth: 1, marginBottom: Spacing.md, overflow: 'hidden', ...Shadows.sm },
-  collPreviewContainer: { width: '100%', height: 120, overflow: 'hidden' },
+  newCollBtnPremium: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: BorderRadius.full,
+    ...Shadows.md
+  },
+  newCollTextPremium: { fontSize: 12, fontWeight: '800', color: '#FFF' },
+  fullCollCard: { width: '48%', borderRadius: BorderRadius.lg, borderWidth: 1, marginBottom: Spacing.md, overflow: 'hidden', ...Shadows.md },
+  collThemeBar: { width: '100%', height: 4 },
+  collPreviewContainer: { width: '100%', height: 110, overflow: 'hidden' },
   previewGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap' },
-  previewImg: { width: '50%', height: '50%', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)' },
+  previewImg: { width: '50%', height: '50%', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.05)' },
   previewImgFull: { width: '100%', height: '100%' },
   previewImgHalf: { width: '50%', height: '100%' },
   previewImgHalfHeight: { width: '100%', height: '50%' },
-  previewMoreOverlay: { position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', width: '50%', height: '50%', justifyContent: 'center', alignItems: 'center' },
-  previewMoreText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
+  previewMoreOverlay: { position: 'absolute', bottom: 0, right: 0, width: '50%', height: '50%', justifyContent: 'center', alignItems: 'center' },
+  previewMoreText: { color: '#FFF', fontSize: 13, fontWeight: '900' },
   previewEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  collStripe: { width: 24, height: 3, borderRadius: 2, marginBottom: 8 },
-  collDetails: { padding: Spacing.sm },
-  collName: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
-  collMetaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  collCount: { fontSize: 11, fontWeight: '500' },
-  listContent: { paddingHorizontal: Spacing.lg, paddingBottom: 100 },
+  emptyCollIcon: { width: 56, height: 56, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
+  collDetails: { padding: Spacing.md },
+  collName: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  collMetaRow: { flexDirection: 'row', alignItems: 'center' },
+  collCount: { fontSize: 12, fontWeight: '600' },
+  listContent: { paddingBottom: 100 },
+  storiesScrollSection: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
   listItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.sm, borderRadius: BorderRadius.lg, marginBottom: Spacing.sm, borderWidth: 1 },
   listCover: { width: 65, height: 90, borderRadius: BorderRadius.md },
   placeholderCover: { justifyContent: 'center', alignItems: 'center' },
