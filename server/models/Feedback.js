@@ -13,6 +13,14 @@ const feedbackSchema = new mongoose.Schema({
     category: {
         type: String,
         default: 'General'
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'reviewed', 'implemented', 'closed'],
+        default: 'pending'
+    },
+    adminNotes: {
+        type: String
     }
 }, { timestamps: true });
 

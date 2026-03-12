@@ -24,6 +24,9 @@ const bugReportSchema = new mongoose.Schema({
         type: String,
         enum: ['pending', 'reproduced', 'fixed', 'closed'],
         default: 'pending'
+    },
+    adminNotes: {
+        type: String
     }
 }, { timestamps: true });
 

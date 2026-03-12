@@ -467,8 +467,24 @@ class ApiService {
         return this.request<any[]>('/support/feedback');
     }
 
+    async updateFeedback(id: string, data: { status?: string; adminNotes?: string }) {
+        return this.request<any>(`/support/feedback/${id}`, { method: 'PATCH', body: data });
+    }
+
+    async deleteFeedback(id: string) {
+        return this.request<any>(`/support/feedback/${id}`, { method: 'DELETE' });
+    }
+
     async getAllBugReports() {
         return this.request<any[]>('/support/bug-reports');
+    }
+
+    async updateBugReport(id: string, data: { status?: string; adminNotes?: string }) {
+        return this.request<any>(`/support/bug-reports/${id}`, { method: 'PATCH', body: data });
+    }
+
+    async deleteBugReport(id: string) {
+        return this.request<any>(`/support/bug-reports/${id}`, { method: 'DELETE' });
     }
 }
 

@@ -124,12 +124,16 @@ const MAPPING = {
   'minus.circle.fill': 'remove-circle',
   'terminal.fill': 'terminal',
   'list.bullet.rectangle.portrait': 'feed',
-  'questionmark.circle.fill': 'help',
-  'bubble.left.fill': 'chat-bubble',
+  'questionmark.circle.fill': 'help-outline',
+  'bubble.left.fill': 'chat',
   'ant.fill': 'bug-report',
   'link': 'link',
   'arrow.counterclockwise': 'refresh',
+  'arrow.clockwise': 'refresh',
   'arrow.down.circle': 'file-download',
+  'shield.fill': 'security',
+  'desktopcomputer': 'computer',
+  'ellipsis.circle': 'more-vert',
 } as IconMapping;
 
 /**

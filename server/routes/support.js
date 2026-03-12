@@ -72,4 +72,68 @@ router.get('/bug-reports', [auth, admin], async (req, res) => {
     }
 });
 
+// @route   PATCH /api/support/feedback/:id
+// @desc    Update feedback status/notes (Admin only)
+router.patch('/feedback/:id', [auth, admin], async (req, res) => {
+    try {
+        const { status, adminNotes } = req.body;
+        const feedback = await Feedback.findByIdAndUpdate(
+            req.params.id,
+            { status, adminNotes },
+            { new: true }
+        ).populate('user', 'username avatar email');
+        
+        if (!feedback) return res.status(404).json({ message: 'Feedback not found' });
+        res.json(feedback);
+    } catch (error) {
+        console.error('Update Feedback Error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   DELETE /api/support/feedback/:id
+// @desc    Delete feedback (Admin only)
+router.delete('/feedback/:id', [auth, admin], async (req, res) => {
+    try {
+        const feedback = await Feedback.findByIdAndDelete(req.params.id);
+        if (!feedback) return res.status(404).json({ message: 'Feedback not found' });
+        res.json({ message: 'Feedback deleted' });
+    } catch (error) {
+        console.error('Delete Feedback Error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   PATCH /api/support/bug-reports/:id
+// @desc    Update bug report status/notes (Admin only)
+router.patch('/bug-reports/:id', [auth, admin], async (req, res) => {
+    try {
+        const { status, adminNotes } = req.body;
+        const bugReport = await BugReport.findByIdAndUpdate(
+            req.params.id,
+            { status, adminNotes },
+            { new: true }
+        ).populate('user', 'username avatar email');
+        
+        if (!bugReport) return res.status(404).json({ message: 'Bug report not found' });
+        res.json(bugReport);
+    } catch (error) {
+        console.error('Update Bug Report Error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   DELETE /api/support/bug-reports/:id
+// @desc    Delete bug report (Admin only)
+router.delete('/bug-reports/:id', [auth, admin], async (req, res) => {
+    try {
+        const bugReport = await BugReport.findByIdAndDelete(req.params.id);
+        if (!bugReport) return res.status(404).json({ message: 'Bug report not found' });
+        res.json({ message: 'Bug report deleted' });
+    } catch (error) {
+        console.error('Delete Bug Report Error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;
