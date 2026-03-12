@@ -284,6 +284,10 @@ class ApiService {
         return this.request<any>(`/progress/${progressId}/increment`, { method: 'PUT' });
     }
 
+    async decrementChapter(progressId: string) {
+        return this.request<any>(`/progress/${progressId}/decrement`, { method: 'PUT' });
+    }
+
     async toggleFavorite(storyId: string) {
         return this.request<{ isFavorite: boolean }>(`/progress/${storyId}/favorite`, { method: 'PUT' });
     }

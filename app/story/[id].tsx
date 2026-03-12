@@ -1,8 +1,10 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -47,10 +49,17 @@ export default function StoryDetailScreen() {
   const [editChapter, setEditChapter] = useState('');
   const [showRecoInput, setShowRecoInput] = useState(false);
   const [recoMessage, setRecoMessage] = useState('');
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
 
   // Add to Collection modal
   const [showCollPicker, setShowCollPicker] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
+
+  // High performance progress scrub
+  const [displayedChapter, setDisplayedChapter] = useState(0);
+  const holdTimer = useRef<NodeJS.Timeout | null>(null);
+  const holdInterval = useRef<NodeJS.Timeout | null>(null);
+  const initialChapterRef = useRef(0);
 
   // Confirmation Modal state
   const [confirmModal, setConfirmModal] = useState({
@@ -93,6 +102,7 @@ export default function StoryDetailScreen() {
         const data = await api.getStory(id);
         setStory(data.story);
         setProgress(data.userProgress);
+        setDisplayedChapter(data.userProgress?.currentChapter || 0);
         setEditChapter(String(data.userProgress?.currentChapter || 0));
         setReviews(data.reviews);
         setIsRecommended(data.isRecommended || false);
@@ -128,6 +138,7 @@ export default function StoryDetailScreen() {
       // Now add to reading progress
       const p = await api.updateProgress({ storyId: result.story._id, status: 'Plan to Read' });
       setProgress(p);
+      setDisplayedChapter(p.currentChapter || 0);
       setStory(result.story);
       setIsMangaDex(false);
       showToast({ message: result.created ? 'Added to library!' : 'Updated in library!', type: 'success' });
@@ -143,6 +154,7 @@ export default function StoryDetailScreen() {
       try {
         const p = await api.updateProgress({ storyId: id, status: 'Plan to Read' });
         setProgress(p);
+        setDisplayedChapter(p.currentChapter || 0);
       } catch (error: any) {
         showToast({ message: error.message, type: 'error' });
       }
@@ -217,11 +229,63 @@ export default function StoryDetailScreen() {
   const handleIncrement = async () => {
     if (!progress) return;
     try {
+      setDisplayedChapter(prev => prev + 1);
       const updated = await api.incrementChapter(progress._id);
       setProgress(updated);
     } catch (error: any) {
+      setDisplayedChapter(progress.currentChapter);
       showToast({ message: error.message, type: 'error' });
     }
+  };
+
+  const handleDecrement = async () => {
+    if (!progress || displayedChapter <= 0) return;
+    try {
+      setDisplayedChapter(prev => Math.max(0, prev - 1));
+      const updated = await api.decrementChapter(progress._id);
+      setProgress(updated);
+    } catch (error: any) {
+      setDisplayedChapter(progress.currentChapter);
+      showToast({ message: error.message, type: 'error' });
+    }
+  };
+
+  const syncHoldValue = async (finalValue: number) => {
+    if (!progress || finalValue === progress.currentChapter) return;
+    try {
+      const p = await api.updateProgress({ 
+        storyId: story._id || id, 
+        currentChapter: finalValue 
+      });
+      setProgress(p);
+    } catch (error: any) {
+      setDisplayedChapter(progress.currentChapter);
+      showToast({ message: 'Sync failed: ' + error.message, type: 'error' });
+    }
+  };
+
+  const startHold = (direction: 'up' | 'down') => {
+    if (!progress) return;
+    initialChapterRef.current = displayedChapter;
+    holdTimer.current = setTimeout(() => {
+      holdInterval.current = setInterval(() => {
+        setDisplayedChapter(prev => {
+          const next = direction === 'up' ? prev + 1 : prev - 1;
+          return Math.max(0, next);
+        });
+      }, 100);
+    }, 400);
+  };
+
+  const stopHold = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    if (holdInterval.current) {
+        clearInterval(holdInterval.current);
+        // Only sync if we actually held long enough to start the interval
+        syncHoldValue(displayedChapter);
+    }
+    holdTimer.current = null;
+    holdInterval.current = null;
   };
 
   const handleSubmitReview = async () => {
@@ -412,7 +476,15 @@ export default function StoryDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={{ flex: 1 }}
+      >
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <IconSymbol name="arrow.left" size={24} color={colors.text} />
@@ -647,13 +719,6 @@ export default function StoryDetailScreen() {
                 <IconSymbol name="book.fill" size={18} color={colors.text} />
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Progress</Text>
               </View>
-              {progress && (
-                <TouchableOpacity onPress={() => setIsEditingProgress(!isEditingProgress)}>
-                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
-                    {isEditingProgress ? 'Cancel' : 'Edit Progress'}
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
 
             {!progress ? (
@@ -664,88 +729,114 @@ export default function StoryDetailScreen() {
                 <Text style={styles.addToLibraryText}>Add to Library</Text>
               </TouchableOpacity>
             ) : (
-              <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                {/* Status */}
-                <View style={styles.progressRow}>
-                  <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Status</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={styles.statusRow}>
-                      {['Reading', 'Completed', 'Plan to Read', 'On Hold', 'Dropped'].map((s) => (
-                        <TouchableOpacity
-                          key={s}
-                          style={[
-                            styles.statusChip,
-                            {
-                              backgroundColor: progress.status === s ? (StatusColors[s] || colors.primary) : 'transparent',
-                              borderColor: StatusColors[s] || colors.primary,
-                            },
-                          ]}
-                          onPress={() => handleStatusChange(s)}>
-                          <Text
-                            style={[
-                              styles.statusChipText,
-                              { color: progress.status === s ? '#FFF' : (StatusColors[s] || colors.primary) },
-                            ]}>
-                            {s}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
+              <View style={[styles.compactProgressCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                {/* Top Bar: Status & Edit Toggle */}
+                <View style={styles.cardHeader}>
+                  <TouchableOpacity 
+                    style={[styles.statusDropdown, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]} 
+                    onPress={() => setShowStatusPicker(!showStatusPicker)}>
+                    <View style={[styles.statusIndicator, { backgroundColor: StatusColors[progress.status] || colors.primary }]} />
+                    <Text style={[styles.currentStatusText, { color: colors.text }]}>{progress.status}</Text>
+                    <IconSymbol name={showStatusPicker ? "chevron.up" : "chevron.down"} size={14} color={colors.textSecondary} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.miniEditBtn, isEditingProgress && { backgroundColor: colors.primary }]} 
+                    onPress={() => setIsEditingProgress(!isEditingProgress)}>
+                    <IconSymbol name={isEditingProgress ? "xmark" : "pencil"} size={14} color={isEditingProgress ? "#FFF" : colors.textSecondary} />
+                  </TouchableOpacity>
                 </View>
 
-                {/* Chapter Progress */}
-                <View style={styles.chapterSection}>
-                  <Text style={[styles.chapterLabel, { color: colors.textSecondary }]}>Chapter Progress</Text>
-                  <View style={styles.chapterRow}>
+                {/* Expanded Status Picker */}
+                {showStatusPicker && (
+                  <View style={styles.statusPickerGrid}>
+                    {['Reading', 'Completed', 'Plan to Read', 'On Hold', 'Dropped'].map((s) => (
+                      <TouchableOpacity
+                        key={s}
+                        style={[
+                          styles.statusPickerItem,
+                          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                          progress.status === s && { backgroundColor: (StatusColors[s] || colors.primary) + '15', borderColor: StatusColors[s] || colors.primary }
+                        ]}
+                        onPress={() => {
+                          handleStatusChange(s);
+                          setShowStatusPicker(false);
+                        }}>
+                        <View style={[styles.statusItemSmallDot, { backgroundColor: StatusColors[s] || colors.primary }]} />
+                        <Text style={[
+                          styles.statusPickerText, 
+                          { color: progress.status === s ? (StatusColors[s] || colors.primary) : colors.textSecondary }
+                        ]}>
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Main Counter UI */}
+                <View style={[styles.counterSection, showStatusPicker && { opacity: 0.3 }]}>
+                  <TouchableOpacity
+                    style={[styles.roundActionBtn, { borderColor: colors.border }]}
+                    onPress={handleDecrement}
+                    onPressIn={() => startHold('down')}
+                    onPressOut={stopHold}>
+                    <IconSymbol name="minus" size={24} color={colors.text} />
+                  </TouchableOpacity>
+
+                  <View style={styles.chapterCenter}>
                     {isEditingProgress ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={styles.inlineEditWrapper}>
                         <TextInput
-                          style={[styles.editProgressInput, { backgroundColor: colors.surfaceElevated, color: colors.text, borderColor: colors.border }]}
+                          style={[styles.centeredChapterInput, { color: colors.primary }]}
                           value={editChapter}
                           onChangeText={setEditChapter}
                           keyboardType="numeric"
+                          returnKeyType="done"
                           autoFocus
                           selectTextOnFocus
+                          onBlur={handleUpdateManualProgress}
+                          onSubmitEditing={handleUpdateManualProgress}
                         />
-                        <TouchableOpacity
-                          style={[styles.saveProgressBtn, { backgroundColor: colors.primary }]}
-                          onPress={handleUpdateManualProgress}>
-                          <IconSymbol name="checkmark" size={16} color="#FFF" />
-                        </TouchableOpacity>
                       </View>
                     ) : (
-                      <Text style={[styles.chapterNumber, { color: colors.primary }]}>
-                        {progress.currentChapter}
-                      </Text>
+                      <TouchableOpacity activeOpacity={0.7} onPress={() => setIsEditingProgress(true)} style={{ alignItems: 'center' }}>
+                        <Text style={[styles.bigChapterNumber, { color: colors.text }]}>
+                          {displayedChapter}
+                        </Text>
+                        <Text style={[styles.counterUnit, { color: colors.textSecondary }]}>CHAPTRES</Text>
+                      </TouchableOpacity>
                     )}
                     {story.totalChapters && (
-                      <Text style={[styles.chapterTotal, { color: colors.textSecondary }]}>
+                      <Text style={[styles.totalCountLabel, { color: colors.textSecondary }]}>
                         / {story.totalChapters}
                       </Text>
                     )}
                   </View>
 
-                  {story.totalChapters > 0 && (
-                    <View style={[styles.progressBar, { backgroundColor: colors.surfaceElevated }]}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          {
-                            backgroundColor: colors.primary,
-                            width: `${Math.min((progress.currentChapter / story.totalChapters) * 100, 100)}%`,
-                          },
-                        ]}
-                      />
-                    </View>
-                  )}
-
                   <TouchableOpacity
-                    style={[styles.incrementBtn, { backgroundColor: colors.primary, ...Shadows.glow }]}
-                    onPress={handleIncrement}>
-                    <Text style={styles.incrementBtnText}>+1 Chapter</Text>
+                    style={[styles.roundActionBtn, { backgroundColor: colors.primary, ...Shadows.glow }]}
+                    onPress={handleIncrement}
+                    onPressIn={() => startHold('up')}
+                    onPressOut={stopHold}>
+                    <IconSymbol name="plus" size={24} color="#FFF" />
                   </TouchableOpacity>
                 </View>
+
+                {/* Slim Progress Bar */}
+                {story.totalChapters > 0 && (
+                  <View style={[styles.slimProgressBar, { backgroundColor: colors.surfaceElevated }]}>
+                    <View
+                      style={[
+                        styles.slimProgressFill,
+                        {
+                          backgroundColor: colors.primary,
+                          width: `${Math.min((displayedChapter / story.totalChapters) * 100, 100)}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -839,7 +930,8 @@ export default function StoryDetailScreen() {
             )}
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Management Options Modal */}
       {showManageModal && (
@@ -1000,19 +1092,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   actionBtnOutlineText: { fontSize: 13, fontWeight: '700' },
-  editProgressInput: {
-    width: 60,
-    height: 44,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: '800',
-  },
   saveProgressBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.md,
+    width: 54,
+    height: 54,
+    borderRadius: BorderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1060,15 +1143,16 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   recoCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
   },
   recoConfirmBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
+    ...Shadows.glow,
   },
 
   // Collection picker
@@ -1099,45 +1183,213 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     gap: 6,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700' },
-  descriptionText: { fontSize: 13, lineHeight: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5 },
+  descriptionText: { fontSize: 14, lineHeight: 22, opacity: 0.8 },
   addToLibraryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    padding: 14,
-    borderRadius: BorderRadius.md,
+    padding: 16,
+    borderRadius: BorderRadius.lg,
+    ...Shadows.md,
   },
-  addToLibraryText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
-  progressCard: { padding: Spacing.lg, borderRadius: BorderRadius.md, borderWidth: 1 },
-  progressRow: { marginBottom: Spacing.md },
-  progressLabel: { fontSize: 12, fontWeight: '600', marginBottom: Spacing.sm },
-  statusRow: { flexDirection: 'row', gap: 6 },
-  statusChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: BorderRadius.full, borderWidth: 1 },
-  statusChipText: { fontSize: 11, fontWeight: '700' },
-  chapterSection: { alignItems: 'center' },
-  chapterLabel: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  chapterRow: { flexDirection: 'row', alignItems: 'baseline' },
-  chapterNumber: { fontSize: 36, fontWeight: '800' },
-  chapterTotal: { fontSize: 18, fontWeight: '600' },
-  progressBar: { width: '100%', height: 6, borderRadius: 3, marginTop: Spacing.sm, marginBottom: Spacing.md },
-  progressFill: { height: '100%', borderRadius: 3 },
-  incrementBtn: { paddingHorizontal: Spacing.xl, paddingVertical: 12, borderRadius: BorderRadius.md },
-  incrementBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
-  writeReview: { fontSize: 14, fontWeight: '700' },
-  reviewForm: { padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, marginBottom: Spacing.md },
-  starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: Spacing.md },
-  reviewInput: { padding: Spacing.md, borderRadius: BorderRadius.sm, borderWidth: 1, minHeight: 80, fontSize: 14 },
-  submitReviewBtn: { marginTop: Spacing.md, padding: 12, borderRadius: BorderRadius.sm, alignItems: 'center' },
-  submitReviewText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
-  noReviews: { fontSize: 14, textAlign: 'center', paddingVertical: Spacing.lg },
-  reviewCard: { padding: Spacing.md, borderRadius: BorderRadius.md, borderWidth: 1, marginBottom: Spacing.sm },
-  reviewHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm },
-  reviewAvatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  reviewAvatarText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
-  reviewMeta: { marginLeft: Spacing.sm },
-  reviewUser: { fontSize: 14, fontWeight: '700' },
-  reviewStars: { flexDirection: 'row', gap: 2 },
-  reviewText: { fontSize: 13, lineHeight: 20 },
+  addToLibraryText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  progressCard: { 
+    padding: Spacing.lg, 
+    borderRadius: BorderRadius.xl, 
+    borderWidth: 1.5,
+    ...Shadows.md,
+  },
+  compactProgressCard: {
+    padding: 16,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1.5,
+    ...Shadows.md,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statusDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    gap: 8,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  currentStatusText: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  miniEditBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusPickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    borderRadius: BorderRadius.lg,
+  },
+  statusPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1.5,
+    gap: 8,
+  },
+  statusItemSmallDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusPickerText: {
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  counterSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    marginVertical: 10,
+  },
+  roundActionBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chapterCenter: {
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  bigChapterNumber: {
+    fontSize: 56,
+    fontWeight: '900',
+    letterSpacing: -2,
+  },
+  counterUnit: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    marginTop: -8,
+    opacity: 0.6,
+  },
+  inlineEditWrapper: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  centeredChapterInput: {
+    fontSize: 56,
+    fontWeight: '900',
+    textAlign: 'center',
+    width: 100,
+    padding: 0,
+    letterSpacing: -2,
+  },
+  totalCountLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
+    opacity: 0.5,
+  },
+  slimProgressBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 16,
+  },
+  slimProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  
+  progressRow: { marginBottom: Spacing.xl },
+  writeReview: { fontSize: 15, fontWeight: '800' },
+  reviewForm: { 
+    padding: Spacing.lg, 
+    borderRadius: BorderRadius.xl, 
+    borderWidth: 1.5, 
+    marginBottom: Spacing.xl,
+    ...Shadows.md
+  },
+  starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: Spacing.lg },
+  reviewInput: { 
+    padding: Spacing.md, 
+    borderRadius: BorderRadius.lg, 
+    borderWidth: 1.5, 
+    minHeight: 120, 
+    fontSize: 15,
+    fontWeight: '500'
+  },
+  submitReviewBtn: { 
+    marginTop: Spacing.lg, 
+    padding: 16, 
+    borderRadius: BorderRadius.lg, 
+    alignItems: 'center',
+    ...Shadows.glow
+  },
+  submitReviewText: { color: '#FFF', fontSize: 16, fontWeight: '900' },
+  
+  emptyBox: { 
+    padding: 30, 
+    borderRadius: BorderRadius.xl, 
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  noReviews: { fontSize: 14, textAlign: 'center', fontWeight: '600', opacity: 0.7 },
+  reviewCard: { 
+    padding: 20, 
+    borderRadius: BorderRadius.xl, 
+    borderWidth: 1.5, 
+    marginBottom: 15,
+    ...Shadows.sm
+  },
+  reviewHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 15 
+  },
+  reviewAvatar: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 22, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  reviewAvatarText: { fontSize: 18, fontWeight: '900' },
+  reviewMeta: { marginLeft: 12, flex: 1 },
+  reviewUser: { fontSize: 16, fontWeight: '800', marginBottom: 2 },
+  reviewStars: { flexDirection: 'row', gap: 3 },
+  reviewDate: { fontSize: 11, fontWeight: '700', opacity: 0.5 },
+  reviewText: { fontSize: 15, lineHeight: 24, fontWeight: '400' },
 });

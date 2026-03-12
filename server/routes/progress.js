@@ -146,6 +146,30 @@ router.put('/:id/increment', auth, async (req, res) => {
     }
 });
 
+// @route   PUT /api/progress/:id/decrement
+// @desc    Quick decrement chapter by 1
+router.put('/:id/decrement', auth, async (req, res) => {
+    try {
+        const progress = await ReadingProgress.findOne({
+            _id: req.params.id,
+            user: req.user._id,
+        });
+
+        if (!progress) return res.status(404).json({ message: 'Progress not found' });
+
+        if (progress.currentChapter > 0) {
+            progress.currentChapter -= 1;
+            progress.lastReadDate = Date.now();
+            await progress.save();
+        }
+
+        await progress.populate('story', 'title coverImage type totalChapters');
+        res.json(progress);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // @route   DELETE /api/progress/:storyId
 // @desc    Remove story from library
 router.delete('/:storyId', auth, async (req, res) => {

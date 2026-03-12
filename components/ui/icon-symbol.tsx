@@ -19,6 +19,8 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'chevron.left': 'chevron-left',
+  'chevron.down': 'expand-more',
+  'chevron.up': 'expand-less',
   'gear': 'settings',
   'ellipsis': 'more-horiz',
   'arrow.left': 'arrow-back',
@@ -30,6 +32,7 @@ const MAPPING = {
   'xmark.circle.fill': 'cancel',
   'plus': 'add',
   'plus.circle.fill': 'add-circle',
+  'minus': 'remove',
   'checkmark': 'check',
   'checkmark.circle.fill': 'check-circle',
 
