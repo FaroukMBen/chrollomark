@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -32,6 +33,8 @@ export default function LibraryScreen() {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'compact'>('list');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
 
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -66,7 +69,14 @@ export default function LibraryScreen() {
 
   const sortedProgress = React.useMemo(() => {
     if (!progress) return [];
-    const items = [...progress];
+    let items = [...progress];
+    
+    // Filter by search query
+    if (librarySearchQuery.trim()) {
+      const q = librarySearchQuery.toLowerCase();
+      items = items.filter(p => p.story?.title?.toLowerCase().includes(q));
+    }
+
     switch (sortBy) {
       case 'az': 
         return items.sort((a, b) => (a.story?.title || '').localeCompare(b.story?.title || ''));
@@ -79,7 +89,15 @@ export default function LibraryScreen() {
       default: 
         return items;
     }
-  }, [progress, sortBy]);
+  }, [progress, sortBy, librarySearchQuery]);
+
+  const filteredCollections = React.useMemo(() => {
+    if (!collections) return [];
+    if (!librarySearchQuery.trim()) return collections;
+    
+    const q = librarySearchQuery.toLowerCase();
+    return collections.filter(c => c.name?.toLowerCase().includes(q));
+  }, [collections, librarySearchQuery]);
 
   const toggleSort = () => {
     const options: Array<'newest' | 'oldest' | 'az' | 'za'> = ['newest', 'oldest', 'az', 'za'];
@@ -260,12 +278,37 @@ export default function LibraryScreen() {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, { color: colors.text }]}>My Library</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {activeSection === 'Collections' ? `${collections.length} collections` : `${progress.length} titles`}
-          </Text>
-        </View>
+        {isSearchVisible ? (
+          <View style={[styles.searchBar, { backgroundColor: colors.surfaceElevated }]}>
+            <IconSymbol name="magnifyingglass" size={18} color={colors.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search in library..."
+              placeholderTextColor={colors.textSecondary}
+              value={librarySearchQuery}
+              onChangeText={setLibrarySearchQuery}
+              autoFocus
+            />
+            <TouchableOpacity onPress={() => { setIsSearchVisible(false); setLibrarySearchQuery(''); }}>
+              <IconSymbol name="xmark.circle.fill" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1 }}>
+            <View>
+              <Text style={[styles.title, { color: colors.text }]}>My Library</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                {activeSection === 'Collections' ? `${filteredCollections.length} collections` : `${sortedProgress.length} titles`}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.searchToggle, { backgroundColor: colors.surfaceElevated }]} 
+              onPress={() => setIsSearchVisible(true)}
+            >
+              <IconSymbol name="magnifyingglass" size={20} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
@@ -323,15 +366,19 @@ export default function LibraryScreen() {
                   <Text style={[styles.newCollText, { color: colors.primary, fontSize: 13 }]}>New Collection</Text>
                 </TouchableOpacity>
               </View>
-              {collections.length === 0 ? (
+              {filteredCollections.length === 0 ? (
                 <View style={styles.emptyCenter}>
                   <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}><IconSymbol name="folder.fill" size={40} color={colors.textSecondary} /></View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No collections yet</Text>
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Create collections to organize your favorite stories</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                    {librarySearchQuery ? "No results found" : "No collections yet"}
+                  </Text>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    {librarySearchQuery ? `No collection matches "${librarySearchQuery}"` : "Create collections to organize your favorite stories"}
+                  </Text>
                 </View>
               ) : (
                 <View style={[styles.gridContainer, { marginTop: Spacing.md }]}>
-                  {collections.map(renderCollectionCard)}
+                  {filteredCollections.map(renderCollectionCard)}
                 </View>
               )}
             </View>
@@ -358,8 +405,12 @@ export default function LibraryScreen() {
               {progress.length === 0 ? (
                 <View style={styles.emptyCenter}>
                   <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}><IconSymbol name="books.vertical.fill" size={40} color={colors.textSecondary} /></View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>{statusFilter === 'All' ? 'Library is empty' : `No "${statusFilter}" titles`}</Text>
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{statusFilter === 'All' ? 'Start by exploring and adding stories to your library' : `You don't have any stories with "${statusFilter}" status`}</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                    {librarySearchQuery ? "No results found" : (statusFilter === 'All' ? 'Library is empty' : `No "${statusFilter}" titles`)}
+                  </Text>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    {librarySearchQuery ? `No stories match "${librarySearchQuery}"` : (statusFilter === 'All' ? 'Start by exploring and adding stories to your library' : `You don't have any stories with "${statusFilter}" status`)}
+                  </Text>
                 </View>
               ) : (
                 <View style={viewMode !== 'list' && styles.gridContainer}>
@@ -455,4 +506,28 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   sortText: { fontSize: 11, fontWeight: '700' },
+  searchBar: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    height: 46, 
+    borderRadius: BorderRadius.lg, 
+    paddingHorizontal: Spacing.md,
+    gap: 10,
+    ...Shadows.sm
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    padding: 0,
+  },
+  searchToggle: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Shadows.sm
+  },
 });
