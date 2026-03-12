@@ -44,6 +44,9 @@ export default function StoryDetailScreen() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
   const [isRecommended, setIsRecommended] = useState(false);
   const [isEditingProgress, setIsEditingProgress] = useState(false);
   const [editChapter, setEditChapter] = useState('');
@@ -290,6 +293,10 @@ export default function StoryDetailScreen() {
 
   const handleSubmitReview = async () => {
     try {
+      if (reviewRating === 0) {
+        showToast({ message: 'Please select a rating', type: 'error' });
+        return;
+      }
       await api.createReview({
         storyId: story?._id || id,
         rating: reviewRating,
@@ -297,10 +304,41 @@ export default function StoryDetailScreen() {
       });
       setShowReviewForm(false);
       setReviewText('');
+      setReviewRating(5);
+      setEditingReviewId(null);
       await loadData();
-      showToast({ message: 'Review submitted', type: 'success' });
+      showToast({ message: editingReviewId ? 'Review updated' : 'Review submitted', type: 'success' });
     } catch (error: any) {
       showToast({ message: error.message, type: 'error' });
+    }
+  };
+
+  const handleEditReview = (review: any) => {
+    setReviewRating(review.rating);
+    setReviewText(review.text || '');
+    setEditingReviewId(review._id);
+    setShowReviewForm(true);
+  };
+
+  const handleDeleteReview = async () => {
+    if (!reviewToDelete) return;
+    try {
+      await api.deleteReview(reviewToDelete);
+      setShowDeleteConfirm(false);
+      setReviewToDelete(null);
+      await loadData();
+      showToast({ message: 'Review deleted', type: 'success' });
+    } catch (error: any) {
+      showToast({ message: error.message, type: 'error' });
+    }
+  };
+
+  const handleLikeReview = async (reviewId: string) => {
+    try {
+      const updatedReview = await api.likeReview(reviewId);
+      setReviews(prev => prev.map(r => r._id === reviewId ? updatedReview : r));
+    } catch (error: any) {
+      showToast({ message: 'Action failed', type: 'error' });
     }
   };
 
@@ -845,93 +883,208 @@ export default function StoryDetailScreen() {
         {/* Reviews Section — only for local stories */}
         {!isMangaDex && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeader}>
-                <IconSymbol name="star.fill" size={18} color={colors.text} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Reviews</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowReviewForm(!showReviewForm)}>
-                <Text style={[styles.writeReview, { color: colors.primary }]}>
-                  {showReviewForm ? 'Cancel' : 'Write Review'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {(() => {
+              const myReview = reviews.find(r => r.user?._id === user?._id);
+              const otherReviews = reviews.filter(r => r.user?._id !== user?._id);
+              const sortedReviews = myReview ? [myReview, ...otherReviews] : reviews;
 
-            {showReviewForm && (
-              <View style={[styles.reviewForm, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                <View style={styles.starsRow}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
-                      <Text style={{ fontSize: 28, color: star <= reviewRating ? colors.accent : colors.textSecondary }}>
-                        ★
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <TextInput
-                  style={[styles.reviewInput, { backgroundColor: colors.surfaceElevated, color: colors.text, borderColor: colors.border }]}
-                  placeholder="Share your thoughts..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={reviewText}
-                  onChangeText={setReviewText}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-                <TouchableOpacity
-                  style={[styles.submitReviewBtn, { backgroundColor: colors.primary }]}
-                  onPress={handleSubmitReview}>
-                  <Text style={styles.submitReviewText}>Submit Review</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {reviews.length === 0 ? (
-              <Text style={[styles.noReviews, { color: colors.textSecondary }]}>
-                No reviews yet. Be the first!
-              </Text>
-            ) : (
-              reviews.map((review) => (
-                <View
-                  key={review._id}
-                  style={[styles.reviewCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                  <View style={styles.reviewHeader}>
-                    {review.user?.avatar ? (
-                      <Image source={{ uri: review.user.avatar }} style={styles.reviewAvatar} contentFit="cover" />
-                    ) : (
-                      <View style={[styles.reviewAvatar, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.reviewAvatarText}>
-                          {review.user?.username?.[0]?.toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={styles.reviewMeta}>
-                      <Text style={[styles.reviewUser, { color: colors.text }]}>
-                        {review.user?.username}
-                      </Text>
-                      <View style={styles.reviewStars}>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Text
-                            key={star}
-                            style={{ fontSize: 12, color: star <= review.rating ? colors.accent : colors.textSecondary }}>
-                            ★
-                          </Text>
-                        ))}
-                      </View>
+              return (
+                <>
+                  <View style={styles.sectionHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <IconSymbol name="star.fill" size={18} color={colors.text} />
+                      <Text style={[styles.sectionTitle, { color: colors.text }]}>Reviews</Text>
                     </View>
                   </View>
-                  {review.text ? (
-                    <Text style={[styles.reviewText, { color: colors.textSecondary }]}>
-                      {review.text}
-                    </Text>
-                  ) : null}
-                </View>
-              ))
-            )}
+
+                  {showReviewForm && (
+                    <View style={[styles.reviewForm, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                      <TouchableOpacity 
+                        style={styles.closeReviewForm} 
+                        onPress={() => {
+                          setShowReviewForm(false);
+                          setEditingReviewId(null);
+                          setReviewText('');
+                          setReviewRating(5);
+                        }}>
+                        <IconSymbol name="xmark" size={14} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                      <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>
+                        {editingReviewId ? 'Edit your existing review' : 'Share your opinion about this story'}
+                      </Text>
+                      <View style={styles.starsRow}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+                            <Text style={{ fontSize: 28, color: star <= reviewRating ? colors.accent : colors.textSecondary }}>
+                              ★
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TextInput
+                        style={[styles.reviewInput, { backgroundColor: colors.surfaceElevated, color: colors.text, borderColor: colors.border }]}
+                        placeholder="Share your thoughts..."
+                        placeholderTextColor={colors.textSecondary}
+                        value={reviewText}
+                        onChangeText={setReviewText}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                      />
+                      <TouchableOpacity
+                        style={[styles.submitReviewBtn, { backgroundColor: colors.primary }]}
+                        onPress={handleSubmitReview}>
+                        <Text style={styles.submitReviewText}>
+                          {editingReviewId ? 'Update Review' : 'Submit Review'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {!myReview && !showReviewForm && (
+                     <View style={[styles.rateStorySection, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
+                        <View style={{ flex: 1 }}>
+                           <Text style={[styles.rateStoryTitle, { color: colors.text }]}>Rate this story</Text>
+                           <Text style={[styles.rateStorySubtitle, { color: colors.textSecondary }]}>Share your experience with the community</Text>
+                        </View>
+                        <TouchableOpacity 
+                           style={[styles.rateStoryBtn, { backgroundColor: colors.primary }]}
+                           onPress={() => setShowReviewForm(true)}>
+                           <IconSymbol name="plus" size={16} color="#FFF" />
+                           <Text style={styles.rateStoryBtnText}>Review</Text>
+                        </TouchableOpacity>
+                     </View>
+                  )}
+
+                  {sortedReviews.length === 0 ? (
+                    <TouchableOpacity 
+                      activeOpacity={0.7}
+                      onPress={() => setShowReviewForm(true)}
+                      style={[styles.emptyBox, { backgroundColor: colors.surfaceElevated }]}>
+                      <IconSymbol name="star" size={32} color={colors.textSecondary} style={{ opacity: 0.3, marginBottom: 12 }} />
+                      <Text style={[styles.noReviews, { color: colors.textSecondary }]}>
+                        No reviews yet. Be the first to share your experience!
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    sortedReviews.map((review) => (
+                      <View
+                        key={review._id}
+                        style={[
+                          styles.premiumReviewCard, 
+                          { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+                          review.user?._id === user?._id && { borderColor: colors.primary + '40', borderWidth: 2 }
+                        ]}>
+                        
+                        {/* Review Header: User Info & Score */}
+                        <View style={styles.reviewHeader}>
+                          <View style={styles.reviewUserInfo}>
+                            {review.user?.avatar ? (
+                              <Image source={{ uri: review.user.avatar }} style={styles.premiumAvatar} contentFit="cover" />
+                            ) : (
+                              <View style={[styles.premiumAvatar, { backgroundColor: colors.primary + '15' }]}>
+                                <Text style={[styles.avatarLetter, { color: colors.primary }]}>
+                                  {review.user?.username?.[0]?.toUpperCase()}
+                                </Text>
+                              </View>
+                            )}
+                            <View style={styles.userMeta}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={[styles.reviewUserName, { color: colors.text }]}>
+                                  {review.user?.username}
+                                </Text>
+                                {review.user?._id === user?._id && (
+                                  <View style={[styles.myReviewBadge, { backgroundColor: colors.primary + '20' }]}>
+                                    <Text style={[styles.myReviewBadgeText, { color: colors.primary }]}>YOU</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <View style={styles.ratingBadge}>
+                                <IconSymbol name="star.fill" size={10} color={colors.accent} />
+                                <Text style={[styles.ratingText, { color: colors.accent }]}>{review.rating}/5</Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* Manage Actions (If Owner) */}
+                          {review.user?._id === user?._id && (
+                            <View style={styles.reviewActionGroup}>
+                              <TouchableOpacity 
+                                style={styles.reviewIconButton} 
+                                onPress={() => handleEditReview(review)}>
+                                <IconSymbol name="pencil" size={14} color={colors.textSecondary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity 
+                                style={styles.reviewIconButton} 
+                                onPress={() => {
+                                  setReviewToDelete(review._id);
+                                  setShowDeleteConfirm(true);
+                                }}>
+                                <IconSymbol name="trash" size={14} color="#FF4444" />
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Review Body */}
+                        {review.text ? (
+                          <Text style={[styles.premiumReviewBody, { color: colors.textSecondary }]}>
+                            {review.text}
+                          </Text>
+                        ) : (
+                          <Text style={[styles.premiumReviewBody, { color: colors.textSecondary, fontStyle: 'italic', opacity: 0.5 }]}>
+                            No comments provided.
+                          </Text>
+                        )}
+
+                        {/* Social Footer: Likes & Interaction */}
+                        <View style={[styles.reviewFooter, { borderTopColor: colors.border + '30' }]}>
+                          <TouchableOpacity 
+                            style={[
+                              styles.socialAction,
+                              review.likes?.includes(user?._id) && { backgroundColor: colors.primary + '15' }
+                            ]}
+                            onPress={() => handleLikeReview(review._id)}>
+                            <IconSymbol 
+                              name={review.likes?.includes(user?._id) ? "hand.thumbsup.fill" : "hand.thumbsup"} 
+                              size={14} 
+                              color={review.likes?.includes(user?._id) ? colors.primary : colors.textSecondary} 
+                            />
+                            <Text style={[
+                              styles.socialCount, 
+                              { color: review.likes?.includes(user?._id) ? colors.primary : colors.textSecondary }
+                            ]}>
+                              {review.likes?.length || 0} Helpful
+                            </Text>
+                          </TouchableOpacity>
+
+                          <Text style={[styles.reviewTime, { color: colors.textSecondary }]}>
+                            {new Date(review.createdAt).toLocaleDateString()}
+                          </Text>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </>
+              );
+            })()}
           </View>
         )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        title="Delete Review"
+        message="Are you sure you want to delete this review? This action cannot be undone."
+        onConfirm={handleDeleteReview}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setReviewToDelete(null);
+        }}
+        confirmText="Delete"
+        isDestructive={true}
+      />
 
       {/* Management Options Modal */}
       {showManageModal && (
@@ -1367,29 +1520,147 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   noReviews: { fontSize: 14, textAlign: 'center', fontWeight: '600', opacity: 0.7 },
-  reviewCard: { 
-    padding: 20, 
-    borderRadius: BorderRadius.xl, 
-    borderWidth: 1.5, 
-    marginBottom: 15,
-    ...Shadows.sm
+  premiumReviewCard: {
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1.5,
+    padding: 16,
+    marginBottom: 16,
+    ...Shadows.sm,
   },
-  reviewHeader: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 15 
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  reviewAvatar: { 
-    width: 44, 
-    height: 44, 
-    borderRadius: 22, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  reviewUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  reviewAvatarText: { fontSize: 18, fontWeight: '900' },
-  reviewMeta: { marginLeft: 12, flex: 1 },
-  reviewUser: { fontSize: 16, fontWeight: '800', marginBottom: 2 },
-  reviewStars: { flexDirection: 'row', gap: 3 },
-  reviewDate: { fontSize: 11, fontWeight: '700', opacity: 0.5 },
-  reviewText: { fontSize: 15, lineHeight: 24, fontWeight: '400' },
+  premiumAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarLetter: {
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  userMeta: {
+    justifyContent: 'center',
+  },
+  reviewUserName: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingText: {
+    fontSize: 11,
+    fontWeight: '800',
+    opacity: 0.9,
+  },
+  reviewActionGroup: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  reviewIconButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  premiumReviewBody: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '500',
+    marginBottom: 16,
+  },
+  reviewFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  socialAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  socialCount: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  myReviewBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  myReviewBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  reviewTime: {
+    fontSize: 10,
+    fontWeight: '700',
+    opacity: 0.4,
+  },
+  formSubtitle: { 
+    fontSize: 13, 
+    textAlign: 'center', 
+    marginBottom: 16, 
+    opacity: 0.6, 
+    fontWeight: '600' 
+  },
+  closeReviewForm: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    zIndex: 10,
+    padding: 4,
+  },
+  rateStorySection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1.5,
+    marginBottom: 20,
+    gap: 16,
+  },
+  rateStoryTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  rateStorySubtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.7,
+  },
+  rateStoryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
+    gap: 6,
+    ...Shadows.glow,
+  },
+  rateStoryBtnText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
 });
