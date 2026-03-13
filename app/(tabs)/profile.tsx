@@ -26,7 +26,7 @@ import { useTheme } from '@/store/ThemeContext';
 import { useToast } from '@/store/ToastContext';
 
 // ─── App Update System (OTA via expo-updates + changelog from version.json) ───
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '2.0.0';
 const CHANGELOG_URL = 'https://raw.githubusercontent.com/FaroukMBen/chrollomark/main/version.json';
 
 interface UpdateInfo {
@@ -96,13 +96,19 @@ export default function ProfileScreen() {
           // Fetch changelog from version.json
           let changelog: string[] = [];
           let version = 'New';
+          let mandatory = false;
           try {
             const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
             const data = await r.json();
             changelog = data.changelog || [];
             version = data.version || 'New';
+            mandatory = data.mandatory || false;
           } catch { /* no changelog available */ }
-          setUpdateInfo({ version, changelog, downloadUrl: '', mandatory: false, isOTA: true });
+          setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
+          
+          if (mandatory) {
+             applyOTAUpdate(); // Trigger auto-download
+          }
           setCheckingUpdate(false);
           return;
         }
@@ -150,13 +156,26 @@ export default function ProfileScreen() {
           if (update.isAvailable) {
             let changelog: string[] = [];
             let version = 'New';
+            let mandatory = false;
             try {
               const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
               const d = await r.json();
               changelog = d.changelog || [];
               version = d.version || 'New';
+              mandatory = d.mandatory || false;
             } catch { /* */ }
-            setUpdateInfo({ version, changelog, downloadUrl: '', mandatory: false, isOTA: true });
+            
+            setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
+
+            // If mandatory, update itself (download and prompt)
+            if (mandatory) {
+              await Updates.fetchUpdateAsync();
+              Alert.alert(
+                "Mandatory Update", 
+                "A critical update (v" + version + ") has been downloaded and is required to continue.",
+                [{ text: "Restart Now", onPress: () => Updates.reloadAsync() }]
+              );
+            }
             return;
           }
         }
@@ -167,7 +186,7 @@ export default function ProfileScreen() {
         }
       } catch { /* silent */ }
     })();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, APP_VERSION]);
 
   const handleLogout = () => {
     setIsLogoutConfirmVisible(true);
@@ -380,11 +399,17 @@ export default function ProfileScreen() {
 
         {/* ─── UPDATE AVAILABLE ─── */}
         {updateInfo && (
-          <View style={[styles.updateCard, { backgroundColor: '#FF674015', borderColor: '#FF6740' }]}>
+          <View style={[styles.updateCard, { 
+            backgroundColor: updateInfo.mandatory ? colors.error + '10' : '#FF674015', 
+            borderColor: updateInfo.mandatory ? colors.error : '#FF6740',
+            borderWidth: updateInfo.mandatory ? 2 : 1
+          }]}>
             <View style={styles.updateHeader}>
               <View style={styles.updateTitleRow}>
-                <IconSymbol name="sparkles" size={18} color="#FF6740" />
-                <Text style={[styles.updateTitle, { color: colors.text }]}>Update Available</Text>
+                <IconSymbol name={updateInfo.mandatory ? "exclamationmark.triangle.fill" : "sparkles"} size={18} color={updateInfo.mandatory ? colors.error : "#FF6740"} />
+                <Text style={[styles.updateTitle, { color: colors.text, fontWeight: updateInfo.mandatory ? '900' : '800' }]}>
+                  {updateInfo.mandatory ? 'MANDATORY UPDATE' : 'Update Available'}
+                </Text>
               </View>
               <View style={[styles.versionBadge, { backgroundColor: '#FF674025' }]}>
                 <Text style={styles.versionText}>v{updateInfo.version}</Text>
@@ -401,7 +426,10 @@ export default function ProfileScreen() {
               </View>
             )}
             <TouchableOpacity
-              style={[styles.updateBtn, { backgroundColor: '#FF6740', opacity: applyingUpdate ? 0.6 : 1 }]}
+              style={[
+                styles.updateBtn, 
+                { backgroundColor: updateInfo.mandatory ? colors.error : '#FF6740', opacity: applyingUpdate ? 0.6 : 1 }
+              ]}
               disabled={applyingUpdate}
               onPress={() => {
                 if (updateInfo.isOTA) {
@@ -412,7 +440,7 @@ export default function ProfileScreen() {
               }}>
               <IconSymbol name={updateInfo.isOTA ? 'arrow.down.circle' : 'arrow.up.right'} size={14} color="#FFF" />
               <Text style={styles.updateBtnText}>
-                {applyingUpdate ? 'Downloading...' : updateInfo.isOTA ? 'Apply Update' : 'Download Update'}
+                {applyingUpdate ? 'Updating System...' : updateInfo.mandatory ? 'Install Mandatory Update' : (updateInfo.isOTA ? 'Apply Update' : 'Download Update')}
               </Text>
             </TouchableOpacity>
           </View>

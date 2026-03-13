@@ -1,10 +1,13 @@
 {
-    "version": "1.0.0",
+    "version": "2.0.0",
     "changelog": [
-        "Initial release with MangaDex integration",
-        "Library, Explore, Social, and Profile screens",
-        "Dark and Light mode support"
+        "BUILD V2.0.0: THE SOCIAL DISCOVERY UPDATE",
+        "Total Home Overhaul: New Hero section and premium glass stats grid",
+        "Popularity Engine: Dynamic trending feeds driven by community engagement",
+        "Real-Time Social: Instant feed and progress sync via Socket.io",
+        "Global Search: Unified search for stories, collections, and users",
+        "UI/UX Polish: Fixed Android overlaps and improved navigation ergonomics"
     ],
     "downloadUrl": "https://github.com/FaroukMBen/chrollomark/releases/latest",
-    "mandatory": false
+    "mandatory": true
 }
