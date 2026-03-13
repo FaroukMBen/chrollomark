@@ -135,13 +135,17 @@ export default function ProfileScreen() {
   const applyOTAUpdate = async () => {
     setApplyingUpdate(true);
     try {
+      // First, fetch the actual bundle
       await Updates.fetchUpdateAsync();
-      Alert.alert('Update Ready', 'The app will restart to apply the update.', [
-        { text: 'Restart Now', onPress: () => Updates.reloadAsync() },
-      ]);
+      
+      showToast({ message: 'Update downloaded! Restarting...', type: 'success' });
+      
+      // Give the user a 2-second buffer to see the success state
+      setTimeout(async () => {
+        await Updates.reloadAsync();
+      }, 2000);
     } catch (e: any) {
-      showToast({ message: `Update failed: ${e.message}`, type: 'error' });
-    } finally {
+      showToast({ message: `Update failed: ${e.message}. Try manual download.`, type: 'error' });
       setApplyingUpdate(false);
     }
   };
@@ -428,7 +432,7 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[
                 styles.updateBtn, 
-                { backgroundColor: updateInfo.mandatory ? colors.error : '#FF6740', opacity: applyingUpdate ? 0.6 : 1 }
+                { backgroundColor: updateInfo.mandatory ? colors.error : colors.primary, opacity: applyingUpdate ? 0.6 : 1 }
               ]}
               disabled={applyingUpdate}
               onPress={() => {
@@ -438,11 +442,18 @@ export default function ProfileScreen() {
                   Linking.openURL(updateInfo.downloadUrl);
                 }
               }}>
-              <IconSymbol name={updateInfo.isOTA ? 'arrow.down.circle' : 'arrow.up.right'} size={14} color="#FFF" />
+              <IconSymbol name={applyingUpdate ? "arrow.2.circlepath" : (updateInfo.isOTA ? "sparkles" : "arrow.down.doc.fill")} size={14} color="#FFF" />
               <Text style={styles.updateBtnText}>
-                {applyingUpdate ? 'Updating System...' : updateInfo.mandatory ? 'Install Mandatory Update' : (updateInfo.isOTA ? 'Apply Update' : 'Download Update')}
+                {applyingUpdate ? 'Implementing Changes...' : 
+                 updateInfo.isOTA ? 'Agree & Update Now' : 
+                 'Update to Latest Version'}
               </Text>
             </TouchableOpacity>
+            {updateInfo.mandatory && !applyingUpdate && (
+              <Text style={[styles.mandatoryHint, { color: colors.textSecondary }]}>
+                This update is required for real-time social features.
+              </Text>
+            )}
           </View>
         )}
 
@@ -785,4 +796,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   themeText: { fontSize: 11, fontWeight: '600' },
+  mandatoryHint: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
+    opacity: 0.7
+  },
 });
