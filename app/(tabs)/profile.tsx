@@ -88,50 +88,61 @@ export default function ProfileScreen() {
 
   const checkForUpdates = async () => {
     setCheckingUpdate(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     try {
-      // Try OTA update first (works in production builds)
+      // Native check
       if (!__DEV__) {
         try {
           const update = await Updates.checkForUpdateAsync();
           if (update.isAvailable) {
-            // Fetch changelog from version.json
-            let changelog: string[] = [];
-            let version = 'New';
-            let mandatory = false;
-            try {
-              const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
-              const data = await r.json();
-              changelog = data.changelog || [];
-              version = data.version || 'New';
-              mandatory = data.mandatory || false;
-            } catch { /* no changelog available */ }
-            setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
-            
-            if (mandatory) {
-               applyOTAUpdate(); // Trigger auto-download
-            }
+            const r = await fetch(CHANGELOG_URL, { 
+              cache: 'no-cache', 
+              signal: controller.signal,
+              headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' } 
+            });
+            const d = await r.json();
+            setUpdateInfo({ 
+              version: d.version || 'New', 
+              changelog: d.changelog || [], 
+              downloadUrl: d.downloadUrl || '', 
+              mandatory: d.mandatory || false, 
+              isOTA: true 
+            });
+            if (d.mandatory) applyOTAUpdate();
+            clearTimeout(timeoutId);
             setCheckingUpdate(false);
             return;
           }
         } catch (e) {
-          console.log('Native update check failed, using fallback:', e);
+          console.log('Native updates unavailable:', e);
         }
       }
 
-      // Fallback: check version.json for APK updates or in dev mode
-      const response = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
-      if (!response.ok) throw new Error('Network error');
+      // Fallback
+      const response = await fetch(CHANGELOG_URL, { 
+        cache: 'no-cache',
+        signal: controller.signal,
+        headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
+      });
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
+      
       const data: UpdateInfo = await response.json();
       if (data.version && data.version !== APP_VERSION) {
         setUpdateInfo({ ...data, isOTA: false });
       } else {
-        showToast({ message: 'You are on the latest version!', type: 'success' });
+        showToast({ message: 'You are on the latest version (v' + APP_VERSION + ')', type: 'success' });
         setUpdateInfo(null);
       }
-    } catch {
-      // In dev mode, version.json might not exist on GitHub yet
-      showToast({ message: __DEV__ ? 'Update check skipped in dev mode' : 'Could not check for updates', type: 'error' });
+    } catch (err: any) {
+      const msg = err.name === 'AbortError' ? 'Request timed out' : err.message;
+      showToast({ 
+        message: __DEV__ ? 'Dev Skip: ' + msg : 'Update error: ' + msg, 
+        type: 'error' 
+      });
     } finally {
+      clearTimeout(timeoutId);
       setCheckingUpdate(false);
     }
   };
