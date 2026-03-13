@@ -91,26 +91,30 @@ export default function ProfileScreen() {
     try {
       // Try OTA update first (works in production builds)
       if (!__DEV__) {
-        const update = await Updates.checkForUpdateAsync();
-        if (update.isAvailable) {
-          // Fetch changelog from version.json
-          let changelog: string[] = [];
-          let version = 'New';
-          let mandatory = false;
-          try {
-            const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
-            const data = await r.json();
-            changelog = data.changelog || [];
-            version = data.version || 'New';
-            mandatory = data.mandatory || false;
-          } catch { /* no changelog available */ }
-          setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
-          
-          if (mandatory) {
-             applyOTAUpdate(); // Trigger auto-download
+        try {
+          const update = await Updates.checkForUpdateAsync();
+          if (update.isAvailable) {
+            // Fetch changelog from version.json
+            let changelog: string[] = [];
+            let version = 'New';
+            let mandatory = false;
+            try {
+              const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
+              const data = await r.json();
+              changelog = data.changelog || [];
+              version = data.version || 'New';
+              mandatory = data.mandatory || false;
+            } catch { /* no changelog available */ }
+            setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
+            
+            if (mandatory) {
+               applyOTAUpdate(); // Trigger auto-download
+            }
+            setCheckingUpdate(false);
+            return;
           }
-          setCheckingUpdate(false);
-          return;
+        } catch (e) {
+          console.log('Native update check failed, using fallback:', e);
         }
       }
 
@@ -156,31 +160,35 @@ export default function ProfileScreen() {
     (async () => {
       try {
         if (!__DEV__) {
-          const update = await Updates.checkForUpdateAsync();
-          if (update.isAvailable) {
-            let changelog: string[] = [];
-            let version = 'New';
-            let mandatory = false;
-            try {
-              const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
-              const d = await r.json();
-              changelog = d.changelog || [];
-              version = d.version || 'New';
-              mandatory = d.mandatory || false;
-            } catch { /* */ }
-            
-            setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
+          try {
+            const update = await Updates.checkForUpdateAsync();
+            if (update.isAvailable) {
+              let changelog: string[] = [];
+              let version = 'New';
+              let mandatory = false;
+              try {
+                const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
+                const d = await r.json();
+                changelog = d.changelog || [];
+                version = d.version || 'New';
+                mandatory = d.mandatory || false;
+              } catch { /* */ }
+              
+              setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
 
-            // If mandatory, update itself (download and prompt)
-            if (mandatory) {
-              await Updates.fetchUpdateAsync();
-              Alert.alert(
-                "Mandatory Update", 
-                "A critical update (v" + version + ") has been downloaded and is required to continue.",
-                [{ text: "Restart Now", onPress: () => Updates.reloadAsync() }]
-              );
+              // If mandatory, update itself (download and prompt)
+              if (mandatory) {
+                await Updates.fetchUpdateAsync();
+                Alert.alert(
+                  "Mandatory Update", 
+                  "A critical update (v" + version + ") has been downloaded and is required to continue.",
+                  [{ text: "Restart Now", onPress: () => Updates.reloadAsync() }]
+                );
+              }
+              return;
             }
-            return;
+          } catch (e) {
+             console.log('Silent update check failed:', e);
           }
         }
         const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
