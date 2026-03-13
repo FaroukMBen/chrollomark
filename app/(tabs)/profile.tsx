@@ -13,9 +13,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Sharing from 'expo-sharing';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, Spacing, StatusColors } from '@/constants/theme';
@@ -58,6 +62,7 @@ export default function ProfileScreen() {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
 
   useEffect(() => {
@@ -164,6 +169,60 @@ export default function ProfileScreen() {
       setApplyingUpdate(false);
     }
   };
+
+  const downloadAndInstallAPK = async (url: string) => {
+    if (Platform.OS !== 'android') {
+      Linking.openURL(url);
+      return;
+    }
+
+    setApplyingUpdate(true);
+    setDownloadProgress(0);
+
+    try {
+      const filename = `chrollomark-update-${Date.now()}.apk`;
+      const fileUri = `${(FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory}${filename}`;
+
+      const downloadResumable = FileSystem.createDownloadResumable(
+        url,
+        fileUri,
+        {},
+        (dp) => {
+          const progress = dp.totalBytesWritten / dp.totalBytesExpectedToWrite;
+          setDownloadProgress(progress);
+        }
+      );
+
+      const result = await downloadResumable.downloadAsync();
+      
+      if (result && result.uri) {
+        setDownloadProgress(1);
+        
+        // Use IntentLauncher to open the APK
+        const cUri = await FileSystem.getContentUriAsync(result.uri);
+        
+        try {
+          await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
+            data: cUri,
+            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+            type: 'application/vnd.android.package-archive',
+          });
+        } catch (intentError) {
+          // Fallback to Sharing if IntentLauncher fails
+          await Sharing.shareAsync(result.uri, {
+            mimeType: 'application/vnd.android.package-archive',
+            UTI: 'com.android.package-archive',
+          });
+        }
+      }
+    } catch (e: any) {
+      showToast({ message: `Download failed: ${e.message}`, type: 'error' });
+    } finally {
+      setApplyingUpdate(false);
+      setDownloadProgress(0);
+    }
+  };
+
 
   // Auto-check on mount (silent, no error toast)
   useEffect(() => {
@@ -458,16 +517,21 @@ export default function ProfileScreen() {
                 if (updateInfo.isOTA) {
                   applyOTAUpdate();
                 } else if (updateInfo.downloadUrl) {
-                  Linking.openURL(updateInfo.downloadUrl);
+                  downloadAndInstallAPK(updateInfo.downloadUrl);
                 }
               }}>
               <IconSymbol name={applyingUpdate ? "arrow.2.circlepath" : (updateInfo.isOTA ? "sparkles" : "arrow.down.doc.fill")} size={14} color="#FFF" />
               <Text style={styles.updateBtnText}>
-                {applyingUpdate ? 'Implementing Changes...' : 
+                {applyingUpdate ? (downloadProgress > 0 ? `Downloading ${Math.round(downloadProgress * 100)}%` : 'Implementing Changes...') : 
                  updateInfo.isOTA ? 'Agree & Update Now' : 
-                 'Update to Latest Version'}
+                 'Install Latest APK'}
               </Text>
             </TouchableOpacity>
+            {applyingUpdate && downloadProgress > 0 && (
+              <View style={{ height: 4, backgroundColor: colors.border + '50', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                <View style={{ height: '100%', width: `${downloadProgress * 100}%`, backgroundColor: updateInfo.mandatory ? colors.error : colors.primary }} />
+              </View>
+            )}
             {updateInfo.mandatory && !applyingUpdate && (
               <Text style={[styles.mandatoryHint, { color: colors.textSecondary }]}>
                 This update is required for real-time social features.
