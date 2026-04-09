@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
 require('dotenv').config();
+
+// Force Node to use reliable DNS servers to fix resolution issues on some Windows setups
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 let bucket;
 
