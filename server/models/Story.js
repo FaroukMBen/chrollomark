@@ -22,7 +22,7 @@ const storySchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ['Manga', 'Webtoon'],
+            enum: ['Manga', 'Webtoon', 'Anime', 'Manhwa', 'Manhua'],
             default: 'Manga',
         },
         genres: [
@@ -76,6 +76,11 @@ const storySchema = new mongoose.Schema(
         ],
         mangadexId: { //in the futur we will compare using the title itself, for now and because it is esier :) we will do it using the mangadex id
             type: String,
+            default: null,
+            index: true,
+        },
+        anilistId: {
+            type: Number,
             default: null,
             index: true,
         },

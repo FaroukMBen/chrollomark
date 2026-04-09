@@ -18,6 +18,11 @@ const readingProgressSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        currentSeason: {
+            type: Number,
+            default: 1,
+            min: 1,
+        },
         status: {
             type: String,
             enum: ['Reading', 'Completed', 'Plan to Read', 'On Hold', 'Dropped'],

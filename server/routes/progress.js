@@ -10,7 +10,7 @@ const router = express.Router();
 // @desc    Add or update reading progress
 router.post('/', auth, async (req, res) => {
     try {
-        const { storyId, currentChapter, status, notes, isFavorite, rating } = req.body;
+        const { storyId, currentChapter, currentSeason, status, notes, isFavorite, rating } = req.body;
 
         // Verify story exists
         const story = await Story.findById(storyId);
@@ -24,6 +24,7 @@ router.post('/', auth, async (req, res) => {
         if (progress) {
             // Update existing
             if (currentChapter !== undefined) progress.currentChapter = currentChapter;
+            if (currentSeason !== undefined) progress.currentSeason = currentSeason;
             if (status) progress.status = status;
             if (notes !== undefined) progress.notes = notes;
             if (isFavorite !== undefined) progress.isFavorite = isFavorite;
@@ -43,6 +44,7 @@ router.post('/', auth, async (req, res) => {
                 user: req.user._id,
                 story: storyId,
                 currentChapter: currentChapter || 0,
+                currentSeason: currentSeason || 1,
                 status: status || 'Plan to Read',
                 notes,
                 isFavorite,
@@ -132,7 +134,15 @@ router.put('/:id/increment', auth, async (req, res) => {
 
         if (!progress) return res.status(404).json({ message: 'Progress not found' });
 
-        progress.currentChapter += 1;
+        // Roll-over logic for Anime
+        const story = await Story.findById(progress.story);
+        if (story.type === 'Anime' && story.totalChapters && progress.currentChapter + 1 > story.totalChapters) {
+            progress.currentChapter = 1;
+            progress.currentSeason += 1;
+        } else {
+            progress.currentChapter += 1;
+        }
+
         progress.lastReadDate = Date.now();
 
         if (progress.status !== 'Reading') {
@@ -142,9 +152,7 @@ router.put('/:id/increment', auth, async (req, res) => {
             progress.status = 'Reading';
         }
 
-        // Check if completed - only if exactly at limit
-        const story = await Story.findById(progress.story);
-        if (story.totalChapters && progress.currentChapter === story.totalChapters) {
+        if (story.type !== 'Anime' && story.totalChapters && progress.currentChapter === story.totalChapters) {
             progress.status = 'Completed';
             progress.completedDate = Date.now();
         }
@@ -158,6 +166,7 @@ router.put('/:id/increment', auth, async (req, res) => {
             username: req.user.username,
             story: progress.story,
             currentChapter: progress.currentChapter,
+            currentSeason: progress.currentSeason,
             status: progress.status
         });
 
@@ -178,11 +187,18 @@ router.put('/:id/decrement', auth, async (req, res) => {
 
         if (!progress) return res.status(404).json({ message: 'Progress not found' });
 
-        if (progress.currentChapter > 0) {
+        const story = await Story.findById(progress.story);
+        if (progress.currentChapter > 1) {
             progress.currentChapter -= 1;
-            progress.lastReadDate = Date.now();
-            await progress.save();
+        } else if (progress.currentChapter === 1 && story.type === 'Anime' && progress.currentSeason > 1) {
+            progress.currentSeason -= 1;
+            progress.currentChapter = story.totalChapters || 1;
+        } else if (progress.currentChapter > 0) {
+            progress.currentChapter -= 1;
         }
+
+        progress.lastReadDate = Date.now();
+        await progress.save();
 
         await progress.populate('story', 'title coverImage type totalChapters');
 
