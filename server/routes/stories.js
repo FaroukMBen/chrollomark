@@ -82,9 +82,9 @@ router.get('/', auth, async (req, res) => {
             ];
         }
         if (type) query.type = type;
-        if (genre) query.genres = { $in: [genre] };
-        if (contentRating) {
-            query.contentRating = { $in: contentRating.split(',') };
+        if (genre) {
+            const genreArray = genre.split(',');
+            query.genres = { $all: genreArray };
         }
 
         const sortOption = sort === 'popularity' ? '-popularityScore' : sort;
@@ -351,6 +351,61 @@ router.post('/clone-mangadex', auth, async (req, res) => {
         res.status(201).json({ story, created: true, updated: false });
     } catch (error) {
         console.error('Clone MangaDex error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   POST /api/stories/clone-anilist
+// @desc    Clone a media from AniList into local DB
+router.post('/clone-anilist', auth, async (req, res) => {
+    try {
+        const { anilistId, title, author, description, coverImage, type, genres, status, totalChapters, year, averageRating } = req.body;
+
+        if (!anilistId || !title) {
+            return res.status(400).json({ message: 'anilistId and title are required' });
+        }
+
+        // Check if already exists
+        let story = await Story.findOne({ anilistId });
+
+        if (story) {
+            // Update fields
+            let updated = false;
+            if (totalChapters && totalChapters !== story.totalChapters) {
+                story.totalChapters = totalChapters;
+                updated = true;
+            }
+            if (status && status !== story.status) {
+                story.status = status;
+                updated = true;
+            }
+            if (coverImage && coverImage !== story.coverImage) {
+                story.coverImage = coverImage;
+                updated = true;
+            }
+            if (updated) await story.save();
+            return res.json({ story, created: false, updated });
+        }
+
+        // Create new
+        story = new Story({
+            title,
+            coverImage: coverImage || '',
+            description: description || '',
+            type: type || 'Manga',
+            genres: genres || [],
+            author: author || 'Unknown Author',
+            status: status || 'Ongoing',
+            totalChapters: totalChapters ? Number.parseInt(totalChapters, 10) : null,
+            addedBy: req.user._id,
+            anilistId: parseInt(anilistId),
+            year: year || null,
+        });
+
+        await story.save();
+        res.status(201).json({ story, created: true, updated: false });
+    } catch (error) {
+        console.error('Clone AniList error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });

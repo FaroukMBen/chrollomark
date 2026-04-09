@@ -119,9 +119,10 @@ router.get('/manga', auth, async (req, res) => {
             status.split(',').forEach(s => url.searchParams.append('status[]', s));
         }
 
-        // Tags filter
+        // Tags filter (AND logic)
         if (tags) {
             tags.split(',').forEach(t => url.searchParams.append('includedTags[]', t));
+            url.searchParams.append('includedTagsMode', 'AND');
         }
 
         const response = await fetch(url.toString());
