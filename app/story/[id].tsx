@@ -1043,25 +1043,27 @@ export default function StoryDetailScreen() {
                   )}
 
                   {/* Main Counter UI */}
+                  
+                  {/* Elegant Season Control (Anime only) */}
+                  {story.type === 'Anime' && !isEditingProgress && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 12 }}>
+                          <TouchableOpacity
+                              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.03)', justifyContent: 'center', alignItems: 'center' }}
+                              onPress={handleSeasonDecrement}>
+                              <IconSymbol name="chevron.left" size={16} color={colors.textSecondary} />
+                          </TouchableOpacity>
+                          <View style={{ paddingHorizontal: 16, paddingVertical: 6, borderRadius: BorderRadius.full, backgroundColor: colors.primary + '15', borderWidth: 1, borderColor: colors.primary + '30' }}>
+                              <Text style={{ fontSize: 13, fontWeight: '900', color: colors.primary, letterSpacing: 1.5 }}>SEASON {displayedSeason}</Text>
+                          </View>
+                          <TouchableOpacity
+                              style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.03)', justifyContent: 'center', alignItems: 'center' }}
+                              onPress={handleSeasonIncrement}>
+                              <IconSymbol name="chevron.right" size={16} color={colors.textSecondary} />
+                          </TouchableOpacity>
+                      </View>
+                  )}
+
                   <View style={[styles.counterSection, showStatusPicker && { opacity: 0.3 }]}>
-                    {/* Season Control (Anime only) */}
-                    {story.type === 'Anime' && (
-                        <View style={styles.seasonColumn}>
-                            <TouchableOpacity
-                                style={[styles.miniActionBtn, { borderColor: colors.border }]}
-                                onPress={handleSeasonIncrement}>
-                                <IconSymbol name="plus" size={14} color={colors.text} />
-                            </TouchableOpacity>
-                            <View style={styles.seasonLabelContainer}>
-                                <Text style={[styles.seasonNumber, { color: colors.text }]}>S{displayedSeason}</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={[styles.miniActionBtn, { borderColor: colors.border }]}
-                                onPress={handleSeasonDecrement}>
-                                <IconSymbol name="minus" size={14} color={colors.text} />
-                            </TouchableOpacity>
-                        </View>
-                    )}
 
                     <TouchableOpacity
                       style={[styles.roundActionBtn, { borderColor: colors.border }]}
@@ -1102,9 +1104,9 @@ export default function StoryDetailScreen() {
                       ) : (
                         <TouchableOpacity activeOpacity={0.7} onPress={() => setIsEditingProgress(true)} style={{ alignItems: 'center' }}>
                           <Text style={[styles.bigChapterNumber, { color: colors.text }]}>
-                            {story.type === 'Anime' ? `S${displayedSeason} E${displayedChapter}` : displayedChapter}
+                            {displayedChapter}
                           </Text>
-                          <Text style={[styles.counterUnit, { color: colors.textSecondary }]}>{unitLabel.toUpperCase()}S</Text>
+                          <Text style={[styles.counterUnit, { color: colors.textSecondary }]}>{story.type === 'Anime' ? 'EPISODES' : unitLabel.toUpperCase() + 'S'}</Text>
                         </TouchableOpacity>
                       )}
                       {story.totalChapters && (
