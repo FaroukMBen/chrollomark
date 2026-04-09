@@ -257,7 +257,10 @@ export default function LibraryScreen() {
                 <View style={[styles.statusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
                 <Text style={[styles.statusText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
               </View>
-              <Text style={[styles.chapterInfo, { color: colors.primary }]}>Ch. {item.currentChapter}{item.story.totalChapters ? ` / ${item.story.totalChapters}` : ''}</Text>
+              <Text style={[styles.chapterInfo, { color: colors.primary }]}>
+                {item.story?.type === 'Anime' ? `S${item.currentSeason || 1} E${item.currentChapter}` : `Ch. ${item.currentChapter}`}
+                {item.story?.totalChapters ? ` / ${item.story.totalChapters}` : ''}
+              </Text>
             </View>
           </View>
           {item.isFavorite && <IconSymbol name="heart.fill" size={14} color="#EF4444" style={{ marginRight: 8 }} />}
@@ -290,7 +293,9 @@ export default function LibraryScreen() {
           <View style={styles.gridInfo}>
             <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
             <View style={styles.gridMeta}>
-              <Text style={[styles.gridChapter, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
+              <Text style={[styles.gridChapter, { color: colors.primary }]}>
+                {item.story?.type === 'Anime' ? `S${item.currentSeason || 1} E${item.currentChapter}` : `Ch. ${item.currentChapter}`}
+              </Text>
               <View style={[styles.gridStatusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
             </View>
           </View>

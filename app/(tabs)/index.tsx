@@ -165,7 +165,9 @@ export default function HomeScreen() {
                 </View>
                 <Text style={styles.heroTitle} numberOfLines={2}>{currentlyReading[0].story.title}</Text>
                 <View style={styles.heroMeta}>
-                  <Text style={styles.heroChapter}>Chapter {currentlyReading[0].currentChapter}</Text>
+                  <Text style={styles.heroChapter}>
+                    {currentlyReading[0].story.type === 'Anime' ? `S${currentlyReading[0].currentSeason || 1} E${currentlyReading[0].currentChapter}` : `Chapter ${currentlyReading[0].currentChapter}`}
+                  </Text>
                   <View style={styles.dot} />
                   <Text style={styles.heroSubText}>{currentlyReading[0].story.type}</Text>
                 </View>
@@ -331,7 +333,7 @@ export default function HomeScreen() {
                         {progress.story.title}
                       </Text>
                       <Text style={[styles.chapterText, { color: colors.textSecondary }]}>
-                        Ch. {progress.currentChapter} / {progress.story.totalChapters || '??'}
+                        {progress.story?.type === 'Anime' ? `S${progress.currentSeason || 1} E${progress.currentChapter}` : `Ch. ${progress.currentChapter}`} / {progress.story.totalChapters || '??'}
                       </Text>
                       {pct > 0 && (
                         <View style={[styles.miniProgressBar, { backgroundColor: colors.surfaceElevated }]}>
@@ -402,7 +404,8 @@ export default function HomeScreen() {
                         <Text style={[styles.statusPillText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
                       </View>
                       <Text style={[styles.activityChapter, { color: colors.textSecondary }]}>
-                        Ch. {item.currentChapter}{item.story?.totalChapters ? ` / ${item.story.totalChapters}` : ''}
+                        {item.story?.type === 'Anime' ? `S${item.currentSeason || 1} E${item.currentChapter}` : `Ch. ${item.currentChapter}`}
+                        {item.story?.totalChapters ? ` / ${item.story.totalChapters}` : ''}
                       </Text>
                     </View>
                   </View>
