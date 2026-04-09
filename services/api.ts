@@ -436,6 +436,16 @@ class ApiService {
         return this.request<{ tags: any[] }>('/mangadex/tags');
     }
 
+    async getMangaDexChapters(mangadexId: string, lang = 'all', offset = '0') {
+        return this.request<{ chapters: any[]; total: number }>('/mangadex/manga/' + mangadexId + '/chapters', {
+            params: { translatedLanguage: lang, offset }
+        });
+    }
+
+    async getMangaDexPages(chapterId: string) {
+        return this.request<{ pages: string[]; dataSaverPages: string[]; hash: string }>('/mangadex/chapter/' + chapterId + '/pages');
+    }
+
     // Clone a MangaDex manga into local DB
     async cloneMangaDex(manga: {
         mangadexId: string;

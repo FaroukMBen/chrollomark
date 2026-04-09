@@ -183,4 +183,77 @@ router.get('/tags', auth, async (_req, res) => {
     }
 });
 
+// @route   GET /api/mangadex/manga/:id/chapters
+// @desc    Get chapters for a manga
+router.get('/manga/:id/chapters', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { limit = '100', offset = '0', translatedLanguage = 'en' } = req.query;
+
+        const url = new URL(`${MANGADEX_BASE}/manga/${id}/feed`);
+        url.searchParams.append('limit', limit);
+        url.searchParams.append('offset', offset);
+        
+        if (translatedLanguage && translatedLanguage !== 'all') {
+            translatedLanguage.split(',').forEach(lang => url.searchParams.append('translatedLanguage[]', lang));
+        }
+
+        url.searchParams.append('order[chapter]', 'asc');
+        url.searchParams.append('includes[]', 'scanlation_group');
+
+        const response = await fetch(url.toString());
+        if (!response.ok) throw new Error(`MangaDex API error: ${response.status}`);
+        const data = await response.json();
+
+        const chapters = (data.data || []).map(ch => ({
+            id: ch.id,
+            chapter: ch.attributes?.chapter,
+            title: ch.attributes?.title,
+            volume: ch.attributes?.volume,
+            pages: ch.attributes?.pages,
+            translatedLanguage: ch.attributes?.translatedLanguage,
+            publishAt: ch.attributes?.publishAt,
+            scanlationGroup: ch.relationships?.find(r => r.type === 'scanlation_group')?.attributes?.name || 'Unknown',
+        }));
+
+        res.json({
+            chapters,
+            total: data.total || 0,
+            limit: Number.parseInt(limit),
+            offset: Number.parseInt(offset),
+        });
+    } catch (error) {
+        console.error('MangaDex chapters error:', error.message);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// @route   GET /api/mangadex/chapter/:id/pages
+// @desc    Get image URLs for a chapter
+router.get('/chapter/:id/pages', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // 1. Get the at-home node URL
+        const response = await fetch(`${MANGADEX_BASE}/at-home/server/${id}`);
+        if (!response.ok) throw new Error(`MangaDex API error: ${response.status}`);
+        const data = await response.json();
+
+        // 2. Construct the URLs for the frontend
+        const baseUrl = data.baseUrl;
+        const hash = data.chapter.hash;
+        const pages = data.chapter.data.map(filename => `${baseUrl}/data/${hash}/${filename}`);
+        const dataSaverPages = data.chapter.dataSaver.map(filename => `${baseUrl}/data-saver/${hash}/${filename}`);
+
+        res.json({
+            pages,
+            dataSaverPages,
+            hash
+        });
+    } catch (error) {
+        console.error('MangaDex pages error:', error.message);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 module.exports = router;
