@@ -264,6 +264,7 @@ class ApiService {
     async updateProgress(data: {
         storyId: string;
         currentChapter?: number;
+        currentSeason?: number;
         status?: string;
         notes?: string;
         isFavorite?: boolean;
@@ -499,6 +500,33 @@ class ApiService {
 
     async deleteBugReport(id: string) {
         return this.request<any>(`/support/bug-reports/${id}`, { method: 'DELETE' });
+    }
+
+    // AniList API
+    async getAniListMedia(params?: { search?: string; page?: string; perPage?: string; type?: string }) {
+        return this.request<{ results: any[]; pageInfo: any }>('/anilist/search', { params });
+    }
+
+    async getAniListDetail(id: string) {
+        return this.request<{ media: any }>(`/anilist/media/${id}`);
+    }
+
+    async cloneAniList(media: {
+        anilistId: number;
+        title: string;
+        description?: string;
+        coverImage?: string;
+        type?: string;
+        genres?: string[];
+        status?: string;
+        totalChapters?: number;
+        year?: number;
+        author?: string;
+    }) {
+        return this.request<{ story: any; created: boolean; updated: boolean }>('/stories/clone-anilist', {
+            method: 'POST',
+            body: media,
+        });
     }
 }
 

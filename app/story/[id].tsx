@@ -27,7 +27,7 @@ import { useToast } from '@/store/ToastContext';
 const isMangaDexId = (id: string) => id.includes('-');
 
 export default function StoryDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, source } = useLocalSearchParams<{ id: string; source?: string }>();
   const { user } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
@@ -42,6 +42,7 @@ export default function StoryDetailScreen() {
   const [friendsProgress, setFriendsProgress] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMangaDex, setIsMangaDex] = useState(false);
+  const [isAniList, setIsAniList] = useState(false);
 
   // Review form state
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -56,6 +57,8 @@ export default function StoryDetailScreen() {
   const [showRecoInput, setShowRecoInput] = useState(false);
   const [recoMessage, setRecoMessage] = useState('');
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [displayedSeason, setDisplayedSeason] = useState(1);
+  const [editSeason, setEditSeason] = useState('1');
 
   // Add to Collection modal
   const [showCollPicker, setShowCollPicker] = useState(false);
@@ -78,9 +81,34 @@ export default function StoryDetailScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      if (isMangaDexId(id)) {
+      if (source === 'anilist' || (!isMangaDexId(id) && id.length < 24 && !isNaN(Number(id)))) {
+        // It's an AniList ID
+        setIsAniList(true);
+        setIsMangaDex(false);
+        const alData = await api.getAniListDetail(id);
+        if (alData.media) {
+          setStory({
+            _id: null,
+            title: alData.media.title,
+            coverImage: alData.media.coverUrl,
+            description: alData.media.description,
+            type: alData.media.type, // Anime, Manga, Manhwa, Manhua
+            genres: alData.media.genres,
+            author: alData.media.author,
+            status: alData.media.status,
+            totalChapters: alData.media.totalChapters,
+            averageRating: alData.media.averageRating || 0,
+            totalReviews: 0,
+            totalReaders: 0,
+            views: 0,
+            year: alData.media.year,
+            anilistId: alData.media.id,
+          });
+        }
+      } else if (source === 'mangadex' || isMangaDexId(id)) {
         // It's a MangaDex UUID — fetch directly from MangaDex API
         setIsMangaDex(true);
+        setIsAniList(false);
         const mdData = await api.getMangaDexDetail(id);
         if (mdData.manga) {
           setStory({
@@ -105,12 +133,15 @@ export default function StoryDetailScreen() {
       } else {
         // It's a MongoDB ObjectId — load from our DB
         setIsMangaDex(false);
+        setIsAniList(false);
         const data = await api.getStory(id);
         setStory(data.story);
         setProgress(data.userProgress);
         setFriendsProgress(data.friendsProgress || []);
         setDisplayedChapter(data.userProgress?.currentChapter || 0);
         setEditChapter(String(data.userProgress?.currentChapter || 0));
+        setDisplayedSeason(data.userProgress?.currentSeason || 1);
+        setEditSeason(String(data.userProgress?.currentSeason || 1));
         setReviews(data.reviews);
         setIsRecommended(data.isRecommended || false);
       }
@@ -123,13 +154,13 @@ export default function StoryDetailScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, source]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   // Real-time progress updates from friends
   useEffect(() => {
-    if (socket && story && !isMangaDex) {
+    if (socket && story && !isMangaDex && !isAniList) {
       const handleProgressUpdate = (update: any) => {
         const updateStoryId = update.story?._id || update.story;
         if (updateStoryId === story._id) {
@@ -143,43 +174,65 @@ export default function StoryDetailScreen() {
         socket.off('progress_update', handleProgressUpdate);
       };
     }
-  }, [socket, story, isMangaDex, loadData]);
+  }, [socket, story, isMangaDex, isAniList, loadData]);
 
-  // Clone from MangaDex to local DB, then reload as local story
+  // Clone from external sources to local DB
   const handleCloneAndAdd = async () => {
     if (!story) return;
     try {
-      const result = await api.cloneMangaDex({
-        mangadexId: story.mangadexId || id,
-        title: story.title,
-        description: story.description,
-        coverImage: story.coverImage,
-        author: story.author,
-        status: story.status,
-        totalChapters: story.totalChapters ? String(story.totalChapters) : undefined,
-        genres: story.genres,
-        year: story.year,
-      });
-      // Now add to reading progress
-      const p = await api.updateProgress({ storyId: result.story._id, status: 'Plan to Read' });
-      setProgress(p);
-      setDisplayedChapter(p.currentChapter || 0);
-      setStory(result.story);
-      setIsMangaDex(false);
-      showToast({ message: result.created ? 'Added to library!' : 'Updated in library!', type: 'success' });
+      let result;
+      if (isMangaDex) {
+        result = await api.cloneMangaDex({
+          mangadexId: story.mangadexId || id,
+          title: story.title,
+          description: story.description,
+          coverImage: story.coverImage,
+          author: story.author,
+          status: story.status,
+          totalChapters: story.totalChapters ? String(story.totalChapters) : undefined,
+          genres: story.genres,
+          year: story.year,
+        });
+        setIsMangaDex(false);
+      } else if (isAniList) {
+        result = await api.cloneAniList({
+          anilistId: story.anilistId || parseInt(id),
+          title: story.title,
+          author: story.author,
+          description: story.description,
+          coverImage: story.coverImage,
+          type: story.type,
+          genres: story.genres,
+          status: story.status,
+          totalChapters: story.totalChapters,
+          year: story.year,
+        });
+        setIsAniList(false);
+      }
+
+      if (result) {
+        // Now add to reading progress
+        const p = await api.updateProgress({ storyId: result.story._id, status: 'Plan to Read' });
+        setProgress(p);
+        setDisplayedChapter(p.currentChapter || 0);
+        setDisplayedSeason(p.currentSeason || 1);
+        setStory(result.story);
+        showToast({ message: result.created ? 'Added to library!' : 'Updated in library!', type: 'success' });
+      }
     } catch (error: any) {
       showToast({ message: error.message || 'Failed to add', type: 'error' });
     }
   };
 
   const handleAddToLibrary = async () => {
-    if (isMangaDex) {
+    if (isMangaDex || isAniList) {
       await handleCloneAndAdd();
     } else {
       try {
         const p = await api.updateProgress({ storyId: id, status: 'Plan to Read' });
         setProgress(p);
         setDisplayedChapter(p.currentChapter || 0);
+        setDisplayedSeason(p.currentSeason || 1);
       } catch (error: any) {
         showToast({ message: error.message, type: 'error' });
       }
@@ -236,43 +289,123 @@ export default function StoryDetailScreen() {
   };
 
   const handleUpdateManualProgress = async () => {
-    try {
-      const chapter = parseInt(editChapter, 10);
-      if (isNaN(chapter)) return;
-
-      const p = await api.updateProgress({
-        storyId: story._id || id,
-        currentChapter: chapter
-      });
-      setProgress(p);
+    const chapter = parseInt(editChapter);
+    const season = parseInt(editSeason);
+    if (isNaN(chapter) || isNaN(season)) {
+      setEditChapter(String(displayedChapter));
+      setEditSeason(String(displayedSeason));
       setIsEditingProgress(false);
+      return;
+    }
+
+    try {
+      const updated = await api.updateProgress({
+        storyId: story?._id || id,
+        currentChapter: chapter,
+        currentSeason: season,
+      });
+      setProgress(updated);
+      setDisplayedChapter(updated.currentChapter);
+      setDisplayedSeason(updated.currentSeason);
+      setIsEditingProgress(false);
+      showToast({ message: 'Progress updated', type: 'success' });
     } catch (error: any) {
       showToast({ message: error.message, type: 'error' });
+      setEditChapter(String(displayedChapter));
+      setEditSeason(String(displayedSeason));
     }
   };
 
   const handleIncrement = async () => {
     if (!progress) return;
     try {
-      setDisplayedChapter(prev => prev + 1);
+      // Local optimistic update
+      let nextChapter = displayedChapter + 1;
+      let nextSeason = displayedSeason;
+      
+      if (story.type === 'Anime' && story.totalChapters && nextChapter > story.totalChapters) {
+        nextChapter = 1;
+        nextSeason += 1;
+      }
+      
+      setDisplayedChapter(nextChapter);
+      setDisplayedSeason(nextSeason);
+      setEditChapter(String(nextChapter));
+      setEditSeason(String(nextSeason));
+
       const updated = await api.incrementChapter(progress._id);
       setProgress(updated);
+      setDisplayedChapter(updated.currentChapter);
+      setDisplayedSeason(updated.currentSeason || 1);
     } catch (error: any) {
-      setDisplayedChapter(progress.currentChapter);
       showToast({ message: error.message, type: 'error' });
+      setDisplayedChapter(progress.currentChapter);
+      setDisplayedSeason(progress.currentSeason || 1);
     }
   };
 
   const handleDecrement = async () => {
-    if (!progress || displayedChapter <= 0) return;
+    if (!progress || displayedChapter === 0 && displayedSeason === 1) return;
     try {
-      setDisplayedChapter(prev => Math.max(0, prev - 1));
+      // Local optimistic update
+      let nextChapter = displayedChapter - 1;
+      let nextSeason = displayedSeason;
+      
+      if (displayedChapter === 1 && story.type === 'Anime' && displayedSeason > 1) {
+        nextSeason -= 1;
+        nextChapter = story.totalChapters || 1;
+      } else if (displayedChapter === 0) {
+          return;
+      }
+      
+      setDisplayedChapter(nextChapter);
+      setDisplayedSeason(nextSeason);
+      setEditChapter(String(nextChapter));
+      setEditSeason(String(nextSeason));
+
       const updated = await api.decrementChapter(progress._id);
       setProgress(updated);
+      setDisplayedChapter(updated.currentChapter);
+      setDisplayedSeason(updated.currentSeason || 1);
     } catch (error: any) {
-      setDisplayedChapter(progress.currentChapter);
       showToast({ message: error.message, type: 'error' });
+      setDisplayedChapter(progress.currentChapter);
+      setDisplayedSeason(progress.currentSeason || 1);
     }
+  };
+  
+  const handleSeasonIncrement = async () => {
+      if (!progress) return;
+      const nextSeason = displayedSeason + 1;
+      try {
+          setDisplayedSeason(nextSeason);
+          setEditSeason(String(nextSeason));
+          const updated = await api.updateProgress({ 
+              storyId: story._id || id, 
+              currentSeason: nextSeason 
+          });
+          setProgress(updated);
+      } catch (error: any) {
+          showToast({ message: error.message, type: 'error' });
+          setDisplayedSeason(progress.currentSeason);
+      }
+  };
+
+  const handleSeasonDecrement = async () => {
+      if (!progress || displayedSeason <= 1) return;
+      const nextSeason = displayedSeason - 1;
+      try {
+          setDisplayedSeason(nextSeason);
+          setEditSeason(String(nextSeason));
+          const updated = await api.updateProgress({ 
+              storyId: story._id || id, 
+              currentSeason: nextSeason 
+          });
+          setProgress(updated);
+      } catch (error: any) {
+          showToast({ message: error.message, type: 'error' });
+          setDisplayedSeason(progress.currentSeason);
+      }
   };
 
   const syncHoldValue = async (finalValue: number) => {
@@ -423,6 +556,8 @@ export default function StoryDetailScreen() {
       showToast({ message: error.message, type: 'error' });
     }
   };
+
+  const unitLabel = story?.type === 'Anime' ? 'Episode' : 'Chapter';
 
   const handleToggleFavorite = async () => {
     let storyId = story?._id;
@@ -601,7 +736,7 @@ export default function StoryDetailScreen() {
                 </View>
                 {story.totalChapters ? (
                   <Text style={[styles.chapterMeta, { color: colors.textSecondary }]}>
-                    {story.totalChapters} chapters
+                    {story.totalChapters} {unitLabel.toLowerCase()}s
                   </Text>
                 ) : null}
               </View>
@@ -639,8 +774,8 @@ export default function StoryDetailScreen() {
               <IconSymbol name="play.fill" size={20} color="#FFF" />
               <Text style={styles.readBtnVIPText}>
                 {progress?.currentChapter > 0 
-                  ? `Continue Reading Ch. ${progress.currentChapter}` 
-                  : 'Start Reading'}
+                  ? `Continue ${unitLabel === 'Episode' ? 'Watching' : 'Reading'} ${unitLabel[0]}. ${progress.currentChapter}` 
+                  : `Start ${unitLabel === 'Episode' ? 'Watching' : 'Reading'}`}
               </Text>
             </TouchableOpacity>
           )}
@@ -799,7 +934,7 @@ export default function StoryDetailScreen() {
                         </Text>
                         <View style={styles.friendSubMeta}>
                           <Text style={[styles.friendProgressText, { color: colors.primary }]}>
-                            Ch. {fp.currentChapter}
+                            {story?.type === 'Anime' ? `S${fp.currentSeason} E${fp.currentChapter}` : `${unitLabel[0]}. ${fp.currentChapter}`}
                           </Text>
                           {progress && diff !== 0 && (
                             <Text style={[styles.diffIndicator, { color: diff > 0 ? '#10B981' : '#EF4444' }]}>
@@ -909,6 +1044,25 @@ export default function StoryDetailScreen() {
 
                   {/* Main Counter UI */}
                   <View style={[styles.counterSection, showStatusPicker && { opacity: 0.3 }]}>
+                    {/* Season Control (Anime only) */}
+                    {story.type === 'Anime' && (
+                        <View style={styles.seasonColumn}>
+                            <TouchableOpacity
+                                style={[styles.miniActionBtn, { borderColor: colors.border }]}
+                                onPress={handleSeasonIncrement}>
+                                <IconSymbol name="plus" size={14} color={colors.text} />
+                            </TouchableOpacity>
+                            <View style={styles.seasonLabelContainer}>
+                                <Text style={[styles.seasonNumber, { color: colors.text }]}>S{displayedSeason}</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.miniActionBtn, { borderColor: colors.border }]}
+                                onPress={handleSeasonDecrement}>
+                                <IconSymbol name="minus" size={14} color={colors.text} />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
                     <TouchableOpacity
                       style={[styles.roundActionBtn, { borderColor: colors.border }]}
                       onPress={handleDecrement}
@@ -920,6 +1074,19 @@ export default function StoryDetailScreen() {
                     <View style={styles.chapterCenter}>
                       {isEditingProgress ? (
                         <View style={styles.inlineEditWrapper}>
+                          {story.type === 'Anime' && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={[styles.editPrefix, { color: colors.textSecondary }]}>S</Text>
+                                <TextInput
+                                    style={[styles.centeredChapterInput, { color: colors.primary, width: 40 }]}
+                                    value={editSeason}
+                                    onChangeText={setEditSeason}
+                                    keyboardType="numeric"
+                                    selectTextOnFocus
+                                />
+                                <Text style={[styles.editPrefix, { color: colors.textSecondary, marginLeft: 8 }]}>E</Text>
+                              </View>
+                          )}
                           <TextInput
                             style={[styles.centeredChapterInput, { color: colors.primary }]}
                             value={editChapter}
@@ -935,9 +1102,9 @@ export default function StoryDetailScreen() {
                       ) : (
                         <TouchableOpacity activeOpacity={0.7} onPress={() => setIsEditingProgress(true)} style={{ alignItems: 'center' }}>
                           <Text style={[styles.bigChapterNumber, { color: colors.text }]}>
-                            {displayedChapter}
+                            {story.type === 'Anime' ? `S${displayedSeason} E${displayedChapter}` : displayedChapter}
                           </Text>
-                          <Text style={[styles.counterUnit, { color: colors.textSecondary }]}>CHAPTRES</Text>
+                          <Text style={[styles.counterUnit, { color: colors.textSecondary }]}>{unitLabel.toUpperCase()}S</Text>
                         </TouchableOpacity>
                       )}
                       {story.totalChapters && (
@@ -1532,6 +1699,34 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  seasonColumn: {
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 10,
+  },
+  miniActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seasonLabelContainer: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  seasonNumber: {
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  editPrefix: {
+    fontSize: 24,
+    fontWeight: '900',
+    opacity: 0.5,
   },
   chapterCenter: {
     alignItems: 'center',

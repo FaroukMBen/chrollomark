@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,7 +22,7 @@ import { api } from '@/services/api';
 import { useAuth } from '@/store/AuthContext';
 import { useToast } from '@/store/ToastContext';
 
-type SourceTab = 'local' | 'mangadex';
+type SourceTab = 'local' | 'mangadex' | 'anilist';
 
 const ORDER_OPTIONS = [
   { label: 'Popular', value: 'popularity', icon: 'flame.fill' as const },
@@ -40,7 +41,13 @@ const STATUS_OPTIONS = [
 const CONTENT_RATINGS = [
   { label: 'Safe', value: 'safe', color: '#10B981' },
   { label: 'Suggestive', value: 'suggestive', color: '#F59E0B' },
+  { label: 'Erotica', value: 'erotica', color: '#EC4899' },
   { label: 'Pornographic', value: 'pornographic', color: '#EF4444' },
+];
+
+const COMMON_GENRES = [
+  'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror', 'Mystery', 
+  'Romance', 'Sci-Fi', 'Slice of Life', 'Supernatural', 'Sports', 'Psychological', 'Thriller'
 ];
 
 const statusColor = (status: string) => {
@@ -82,6 +89,18 @@ export default function ExploreScreen() {
   const [mdOffset, setMdOffset] = useState(0);
   const [mdLoading, setMdLoading] = useState(false);
 
+  // AniList state
+  const [alResults, setAlResults] = useState<any[]>([]);
+  const [alPage, setAlPage] = useState(1);
+  const [alHasNextPage, setAlHasNextPage] = useState(false);
+  const [alTotal, setAlTotal] = useState(0);
+  const [alLoading, setAlLoading] = useState(false);
+  const [alType, setAlType] = useState<'ANIME' | 'MANGA'>('MANGA');
+
+  // Genre filtering
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [mdTags, setMdTags] = useState<any[]>([]); // For MangaDex tag ID mapping
+
   // Shared filter state (used by BOTH tabs for a unified experience)
   const [order, setOrder] = useState('popularity');
   const [statusFilter, setStatusFilter] = useState('');
@@ -100,6 +119,7 @@ export default function ExploreScreen() {
     setOrder('popularity');
     setStatusFilter('');
     setContentRating('safe,suggestive');
+    setSelectedGenres([]);
   };
 
   const handleSearchChange = useCallback((text: string) => {
@@ -115,6 +135,7 @@ export default function ExploreScreen() {
       progress.forEach((p: any) => {
         if (p.story?._id) ids.add(p.story._id);
         if (p.story?.mangadexId) ids.add(p.story.mangadexId);
+        if (p.story?.anilistId) ids.add(String(p.story.anilistId));
       });
       setUserLibraryIds(ids);
     } catch { /* ignore */ }
@@ -129,9 +150,15 @@ export default function ExploreScreen() {
       else if (order === 'latestUploadedChapter') sortParam = '-updatedAt';
       else if (order === 'title') sortParam = 'title';
 
-      const params: any = { page: String(pageNum), limit: '20', sort: sortParam };
+      const params: any = { 
+        page: String(pageNum), 
+        limit: '20', 
+        sort: sortParam,
+        contentRating,
+      };
       
       if (searchRef.current.trim()) params.search = searchRef.current.trim();
+      if (selectedGenres.length > 0) params.genre = selectedGenres.join(',');
       if (statusFilter) {
         // Map lowercase to our DB status
         const sMap: Record<string, string> = { ongoing: 'Ongoing', completed: 'Completed', hiatus: 'Hiatus', cancelled: 'Cancelled' };
@@ -139,7 +166,11 @@ export default function ExploreScreen() {
       }
 
       const data = await api.getStories(params);
-      setLocalResults(append ? prev => [...prev, ...data.stories] : data.stories);
+      setLocalResults(prev => {
+        if (!append) return data.stories;
+        const existingIds = new Set(prev.map(p => p._id));
+        return [...prev, ...data.stories.filter((p: any) => !existingIds.has(p._id))];
+      });
       setLocalTotalPages(data.totalPages);
       setLocalTotal(data.total);
       setLocalPage(pageNum);
@@ -148,7 +179,7 @@ export default function ExploreScreen() {
     } finally {
       setLocalLoading(false);
     }
-  }, [order, statusFilter]);
+  }, [order, statusFilter, contentRating, selectedGenres]);
 
   // --- MangaDex ---
   const loadMangaDex = useCallback(async (offset = 0, append = false) => {
@@ -163,9 +194,21 @@ export default function ExploreScreen() {
       };
       if (searchRef.current.trim()) params.title = searchRef.current.trim();
       if (statusFilter) params.status = statusFilter;
+      
+      if (selectedGenres.length > 0) {
+        const tagIds = selectedGenres
+          .map(g => mdTags.find(t => t.name.toLowerCase() === g.toLowerCase())?.id)
+          .filter(Boolean);
+        if (tagIds.length > 0) params.tags = tagIds.join(',');
+      }
 
       const data = await api.getMangaDexManga(params);
-      setMdResults(append ? prev => [...prev, ...(data.results || [])] : (data.results || []));
+      setMdResults(prev => {
+        const newData = data.results || [];
+        if (!append) return newData;
+        const existingIds = new Set(prev.map(item => item.id));
+        return [...prev, ...newData.filter(item => !existingIds.has(item.id))];
+      });
       setMdTotal(data.total || 0);
       setMdOffset(offset);
     } catch (error) {
@@ -174,29 +217,66 @@ export default function ExploreScreen() {
     } finally {
       setMdLoading(false);
     }
-  }, [order, statusFilter, contentRating]);
+  }, [order, statusFilter, contentRating, mdTags, selectedGenres]);
+
+  // --- AniList ---
+  const loadAniList = useCallback(async (pageNum = 1, append = false) => {
+    setAlLoading(true);
+    try {
+      const params: any = {
+        page: String(pageNum),
+        perPage: '20',
+        type: alType,
+      };
+      if (searchRef.current.trim()) params.search = searchRef.current.trim();
+      if (contentRating) params.contentRating = contentRating;
+      if (selectedGenres.length > 0) params.genres = selectedGenres.join(',');
+      
+      const data = await api.getAniListMedia(params);
+      setAlResults(prev => {
+        const newData = data.results || [];
+        if (!append) return newData;
+        const existingIds = new Set(prev.map(item => String(item.id)));
+        return [...prev, ...newData.filter(item => !existingIds.has(String(item.id)))];
+      });
+      setAlPage(pageNum);
+      setAlHasNextPage(data.pageInfo?.hasNextPage || false);
+      setAlTotal(data.pageInfo?.total || 0);
+    } catch (error) {
+      console.log('AniList error:', error);
+      if (!append) setAlResults([]);
+    } finally {
+      setAlLoading(false);
+    }
+  }, [contentRating, alType, selectedGenres]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     loadUserLibrary();
+    // Fetch MangaDex tags for mapping
+    api.getMangaDexTags().then(res => setMdTags(res.tags || []));
   }, [isAuthenticated, loadUserLibrary]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     if (source === 'local') {
       loadLocal(1);
-    } else {
+    } else if (source === 'mangadex') {
       loadMangaDex(0);
+    } else {
+      loadAniList(1);
     }
-  }, [isAuthenticated, source, loadLocal, loadMangaDex]);
+  }, [isAuthenticated, source, loadLocal, loadMangaDex, loadAniList]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadUserLibrary();
     if (source === 'local') {
       await loadLocal(1);
-    } else {
+    } else if (source === 'mangadex') {
       await loadMangaDex(0);
+    } else {
+      await loadAniList(1);
     }
     setRefreshing(false);
   };
@@ -204,22 +284,26 @@ export default function ExploreScreen() {
   const loadMore = () => {
     if (source === 'local') {
       if (localPage < localTotalPages && !localLoading) loadLocal(localPage + 1, true);
-    } else {
+    } else if (source === 'mangadex') {
       if (mdResults.length < mdTotal && !mdLoading) loadMangaDex(mdOffset + 20, true);
+    } else {
+      if (alHasNextPage && !alLoading) loadAniList(alPage + 1, true);
     }
   };
 
   const doSearch = useCallback(() => {
     if (source === 'local') {
       loadLocal(1);
-    } else {
+    } else if (source === 'mangadex') {
       loadMangaDex(0);
+    } else {
+      loadAniList(1);
     }
-  }, [source, loadLocal, loadMangaDex]);
+  }, [source, loadLocal, loadMangaDex, loadAniList]);
 
-  const handleAddToLibrary = async (item: any, isMD: boolean) => {
+  const handleAddToLibrary = async (item: any, sourceTab: SourceTab) => {
     try {
-      if (isMD) {
+      if (sourceTab === 'mangadex') {
         const result = await api.cloneMangaDex({
           mangadexId: item.id,
           title: item.title,
@@ -231,10 +315,25 @@ export default function ExploreScreen() {
           genres: item.tags,
           year: item.year,
         });
-        // Also create reading progress
         await api.updateProgress({ storyId: result.story._id, status: 'Plan to Read' });
         setUserLibraryIds(prev => new Set([...prev, item.id, result.story._id]));
-        showToast({ message: result.created ? `"${item.title}" added to library!` : `"${item.title}" synced`, type: 'success' });
+        showToast({ message: `"${item.title}" added to library!`, type: 'success' });
+      } else if (sourceTab === 'anilist') {
+        const result = await api.cloneAniList({
+          anilistId: item.id,
+          title: item.title,
+          author: item.author,
+          description: item.description,
+          coverImage: item.coverUrl,
+          type: item.type,
+          genres: item.genres,
+          status: item.status,
+          totalChapters: item.totalChapters,
+          year: item.year,
+        });
+        await api.updateProgress({ storyId: result.story._id, status: 'Plan to Read' });
+        setUserLibraryIds(prev => new Set([...prev, String(item.id), result.story._id]));
+        showToast({ message: `"${item.title}" added to library!`, type: 'success' });
       } else {
         // Local story — add to user's reading progress
         await api.updateProgress({ storyId: item._id, status: 'Plan to Read' });
@@ -246,8 +345,9 @@ export default function ExploreScreen() {
     }
   };
 
-  const isInLibrary = (item: any, isMD: boolean) => {
-    if (isMD) return userLibraryIds.has(item.id);
+  const isInLibrary = (item: any, sourceTab: SourceTab) => {
+    if (sourceTab === 'mangadex') return userLibraryIds.has(item.id);
+    if (sourceTab === 'anilist') return userLibraryIds.has(String(item.id));
     return userLibraryIds.has(item._id);
   };
 
@@ -267,21 +367,22 @@ export default function ExploreScreen() {
   // ─── Unified card renderer (same style for both tabs) ───
   const renderCard = ({ item }: { item: any }) => {
     const isMD = source === 'mangadex';
+    const isAL = source === 'anilist';
     const title = item.title;
-    const coverUrl = isMD ? item.coverUrl : item.coverImage;
-    const author = item.author || (isMD ? '' : item.addedBy?.username);
-    const status = isMD ? item.status : (item.status || 'ongoing');
+    const coverUrl = (isMD || isAL) ? item.coverUrl : item.coverImage;
+    const author = item.author || (isMD || isAL ? '' : item.addedBy?.username);
+    const status = (isMD || isAL) ? item.status : (item.status || 'ongoing');
     const sColor = statusColor(status);
-    const year = isMD ? item.year : item.year;
-    const tags = isMD ? item.tags : item.genres;
-    const inLib = isInLibrary(item, isMD);
-    const storyId = isMD ? item.id : item._id;
+    const year = item.year;
+    const tags = isMD ? item.tags : (isAL ? item.genres : item.genres);
+    const inLib = isInLibrary(item, source);
+    const storyId = (isMD || isAL) ? item.id : item._id;
 
     return (
       <View style={[styles.gridItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => router.push(`/story/${storyId}` as any)}>
+          onPress={() => router.push(`/story/${storyId}?source=${source}` as any)}>
           {coverUrl ? (
             <Image source={{ uri: coverUrl }} style={styles.gridCover} contentFit="cover" />
           ) : (
@@ -298,7 +399,12 @@ export default function ExploreScreen() {
                 <Text style={styles.apiBadgeText}>MANGADEX</Text>
               </View>
             )}
-            {!isMD && (
+            {isAL && (
+              <View style={[styles.apiBadge, { backgroundColor: '#3DB4F2' }]}>
+                <Text style={styles.apiBadgeText}>ANILIST</Text>
+              </View>
+            )}
+            {!isMD && !isAL && (
               <View style={[styles.apiBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.apiBadgeText}>CHROLLOMARK</Text>
               </View>
@@ -317,6 +423,11 @@ export default function ExploreScreen() {
               {year ? (
                 <Text style={[styles.yearText, { color: colors.textSecondary }]}>{year}</Text>
               ) : null}
+              {isAL && (
+                <View style={[styles.typePill, { backgroundColor: colors.accent + '20' }]}>
+                  <Text style={[styles.typeText, { color: colors.accent }]}>{item.type}</Text>
+                </View>
+              )}
               {isMD && item.contentRating === 'suggestive' && (
                 <View style={[styles.typePill, { backgroundColor: '#F59E0B20' }]}>
                   <Text style={[styles.typeText, { color: '#F59E0B' }]}>16+</Text>
@@ -334,7 +445,7 @@ export default function ExploreScreen() {
         {/* Add to Library — always at bottom */}
         <TouchableOpacity
           style={[styles.addToLibBtn, { backgroundColor: inLib ? colors.surfaceElevated : colors.primary }]}
-          onPress={() => !inLib && handleAddToLibrary(item, isMD)}
+          onPress={() => !inLib && handleAddToLibrary(item, source)}
           disabled={inLib}
           activeOpacity={inLib ? 1 : 0.8}>
           {inLib ? (
@@ -362,9 +473,9 @@ export default function ExploreScreen() {
     </View>
   );
 
-  const currentData = source === 'local' ? localResults : mdResults;
-  const currentLoading = source === 'local' ? localLoading : mdLoading;
-  const totalCount = source === 'local' ? localTotal : mdTotal;
+  const currentData = source === 'local' ? localResults : (source === 'mangadex' ? mdResults : alResults);
+  const currentLoading = source === 'local' ? localLoading : (source === 'mangadex' ? mdLoading : alLoading);
+  const totalCount = source === 'local' ? localTotal : (source === 'mangadex' ? mdTotal : alTotal);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
@@ -385,8 +496,10 @@ export default function ExploreScreen() {
           {([
             { key: 'local' as SourceTab, label: 'Chrollomark', icon: 'books.vertical.fill' as const },
             { key: 'mangadex' as SourceTab, label: 'MangaDex', icon: 'globe' as const },
+            { key: 'anilist' as SourceTab, label: 'AniList', icon: 'sparkles' as const },
           ]).map(({ key, label, icon }) => {
             const isActive = source === key;
+            const activeColor = key === 'mangadex' ? '#FF6740' : (key === 'anilist' ? '#3DB4F2' : colors.primary);
             return (
               <TouchableOpacity
                 key={key}
@@ -395,7 +508,7 @@ export default function ExploreScreen() {
                 <IconSymbol 
                   name={icon} 
                   size={14} 
-                  color={isActive ? (key === 'mangadex' ? '#FF6740' : colors.primary) : colors.textSecondary} 
+                  color={isActive ? activeColor : colors.textSecondary} 
                 />
                 <Text style={[styles.sourceTabText, { color: isActive ? colors.text : colors.textSecondary }]}>
                   {label}
@@ -411,7 +524,7 @@ export default function ExploreScreen() {
             <IconSymbol name="magnifyingglass" size={17} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder={source === 'mangadex' ? 'Search MangaDex...' : 'Search Chrollomark...'}
+              placeholder={source === 'mangadex' ? 'Search MangaDex...' : (source === 'anilist' ? 'Search AniList...' : 'Search Chrollomark...')}
               placeholderTextColor={colors.textSecondary}
               value={search}
               onChangeText={handleSearchChange}
@@ -448,7 +561,7 @@ export default function ExploreScreen() {
 
         {/* Collapsible Filter Container */}
         {showFilters && (
-          <View style={[styles.filterPanelFull, { backgroundColor: colors.surface + '40', borderBottomColor: colors.border, marginTop: Spacing.sm }]}>            
+          <ScrollView style={[styles.filterPanelFull, { backgroundColor: colors.surface + '40', borderBottomColor: colors.border, marginTop: Spacing.sm, maxHeight: 450 }]}>            
             {/* Sort Section */}
             <View style={styles.filterSection}>
               <View style={styles.filterPanelHeader}>
@@ -512,6 +625,23 @@ export default function ExploreScreen() {
                 <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>MATURITY</Text>
               </View>
               
+              {source === 'anilist' && (
+                <View style={[styles.filterGridWrapContainer, { marginBottom: Spacing.md }]}>
+                  {[{ label: 'Manga', value: 'MANGA' }, { label: 'Anime', value: 'ANIME' }].map(t => (
+                    <TouchableOpacity
+                      key={t.value}
+                      style={[
+                        styles.filterTilePremium,
+                        { backgroundColor: colors.surfaceElevated, flex: 1 },
+                        alType === t.value && { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderWidth: 1 }
+                      ]}
+                      onPress={() => setAlType(t.value as any)}>
+                      <Text style={[styles.filterTileText, { color: alType === t.value ? colors.primary : colors.text }]}>{t.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               <View style={styles.filterGridWrapContainer}>
                 {CONTENT_RATINGS.map(opt => {
                   const active = contentRating.includes(opt.value);
@@ -535,7 +665,37 @@ export default function ExploreScreen() {
                 })}
               </View>
             </View>
-          </View>
+
+            {/* Genre Section */}
+            <View style={[styles.filterSection, { marginTop: Spacing.lg }]}>
+              <View style={styles.filterPanelHeader}>
+                <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>GENRES (AND LOGIC)</Text>
+              </View>
+              <View style={styles.filterGridWrapContainer}>
+                {COMMON_GENRES.map(item => {
+                  const active = selectedGenres.includes(item);
+                  return (
+                    <TouchableOpacity
+                      key={item}
+                      style={[
+                        styles.filterChipPremium,
+                        { backgroundColor: colors.surfaceElevated },
+                        active && { backgroundColor: colors.primary + '15', borderColor: colors.primary, borderWidth: 1 }
+                      ]}
+                      onPress={() => {
+                        setSelectedGenres(prev => 
+                          active ? prev.filter(g => g !== item) : [...prev, item]
+                        );
+                      }}>
+                      <Text style={[styles.filterChipText, { color: active ? colors.primary : colors.text }]}>
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </ScrollView>
         )}
 
         <View style={styles.resultsHeader}>
@@ -550,7 +710,7 @@ export default function ExploreScreen() {
         <FlatList
           data={currentData}
           renderItem={renderCard}
-          keyExtractor={(item, i) => source === 'local' ? item._id : `md-${item.id || i}`}
+          keyExtractor={(item, i) => source === 'local' ? item._id : `${source}-${item.id || i}`}
           numColumns={2}
           columnWrapperStyle={styles.gridRow}
           ListEmptyComponent={renderEmpty}
@@ -561,7 +721,9 @@ export default function ExploreScreen() {
           contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
           ListFooterComponent={
-            (source === 'local' && localPage < localTotalPages) || (source === 'mangadex' && mdResults.length < mdTotal) ? (
+            (source === 'local' && localPage < localTotalPages) || 
+            (source === 'mangadex' && mdResults.length < mdTotal) ||
+            (source === 'anilist' && alHasNextPage) ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ padding: Spacing.lg }} />
             ) : null
           }
