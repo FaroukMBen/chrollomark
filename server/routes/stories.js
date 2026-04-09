@@ -383,6 +383,13 @@ router.post('/clone-anilist', auth, async (req, res) => {
                 story.coverImage = coverImage;
                 updated = true;
             }
+            if (author && author !== 'Unknown Author' && story.author === 'Unknown Author') {
+                story.author = author;
+                updated = true;
+            } else if (author && author !== 'Unknown Author' && story.author !== author) {
+                story.author = author;
+                updated = true;
+            }
             if (updated) await story.save();
             return res.json({ story, created: false, updated });
         }

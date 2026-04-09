@@ -84,7 +84,7 @@ router.get('/search', auth, async (req, res) => {
                 large
               }
               bannerImage
-              staff {
+              staff(sort: [RELEVANCE, ID]) {
                 edges {
                   role
                   node {
@@ -190,7 +190,7 @@ router.get('/media/:id', auth, async (req, res) => {
               large
             }
             bannerImage
-            staff {
+            staff(sort: [RELEVANCE, ID]) {
               edges {
                 role
                 node {
