@@ -12,6 +12,7 @@ import { ToastProvider, useToast } from '@/store/ToastContext';
 
 import { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const ChrolloDark = {
 
@@ -119,50 +120,52 @@ function RootLayoutInner() {
   const bgColor = theme.colors.background;
 
   return (
-    <NavThemeProvider value={theme}>
-      <View style={{ flex: 1, backgroundColor: bgColor }}>
-        <ToastProvider>
-          <GlobalSocketListener />
-          <Stack screenOptions={{ 
-            headerShown: false,
-            contentStyle: { backgroundColor: bgColor },
-            animation: 'slide_from_right',
-          }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen
-              name="auth/login"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen
-              name="auth/register"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen
-              name="story/add"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen name="story/[id]" />
-            <Stack.Screen
-              name="collection/create"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen name="collection/[id]" />
-            <Stack.Screen name="user/[id]" />
-            <Stack.Screen name="profile/dev-log" />
-            <Stack.Screen
-              name="profile/feedback"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen
-              name="profile/report-bug"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen name="profile/admin" />
-          </Stack>
-        </ToastProvider>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      </View>
-    </NavThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavThemeProvider value={theme}>
+        <View style={{ flex: 1, backgroundColor: bgColor }}>
+          <ToastProvider>
+            <GlobalSocketListener />
+            <Stack screenOptions={{ 
+              headerShown: false,
+              contentStyle: { backgroundColor: bgColor },
+              animation: 'slide_from_right',
+            }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen
+                name="auth/login"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="auth/register"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="story/add"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen name="story/[id]" />
+              <Stack.Screen
+                name="collection/create"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen name="collection/[id]" />
+              <Stack.Screen name="user/[id]" />
+              <Stack.Screen name="profile/dev-log" />
+              <Stack.Screen
+                name="profile/feedback"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="profile/report-bug"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen name="profile/admin" />
+            </Stack>
+          </ToastProvider>
+          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        </View>
+      </NavThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 

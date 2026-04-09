@@ -72,7 +72,7 @@ export default function StoryDetailScreen() {
     visible: false,
     title: '',
     message: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
     isDestructive: true,
   });
 
@@ -137,7 +137,7 @@ export default function StoryDetailScreen() {
           loadData();
         }
       };
-      
+
       socket.on('progress_update', handleProgressUpdate);
       return () => {
         socket.off('progress_update', handleProgressUpdate);
@@ -239,10 +239,10 @@ export default function StoryDetailScreen() {
     try {
       const chapter = parseInt(editChapter, 10);
       if (isNaN(chapter)) return;
-      
-      const p = await api.updateProgress({ 
-        storyId: story._id || id, 
-        currentChapter: chapter 
+
+      const p = await api.updateProgress({
+        storyId: story._id || id,
+        currentChapter: chapter
       });
       setProgress(p);
       setIsEditingProgress(false);
@@ -278,9 +278,9 @@ export default function StoryDetailScreen() {
   const syncHoldValue = async (finalValue: number) => {
     if (!progress || finalValue === progress.currentChapter) return;
     try {
-      const p = await api.updateProgress({ 
-        storyId: story._id || id, 
-        currentChapter: finalValue 
+      const p = await api.updateProgress({
+        storyId: story._id || id,
+        currentChapter: finalValue
       });
       setProgress(p);
     } catch (error: any) {
@@ -305,9 +305,9 @@ export default function StoryDetailScreen() {
   const stopHold = () => {
     if (holdTimer.current) clearTimeout(holdTimer.current);
     if (holdInterval.current) {
-        clearInterval(holdInterval.current);
-        // Only sync if we actually held long enough to start the interval
-        syncHoldValue(displayedChapter);
+      clearInterval(holdInterval.current);
+      // Only sync if we actually held long enough to start the interval
+      syncHoldValue(displayedChapter);
     }
     holdTimer.current = null;
     holdInterval.current = null;
@@ -396,10 +396,10 @@ export default function StoryDetailScreen() {
     if (!story || isMangaDex) return;
     try {
       const result = await api.likeStory(story._id);
-      setStory({ 
-        ...story, 
-        likes: result.isLiked 
-          ? [...(story.likes || []), user?._id] 
+      setStory({
+        ...story,
+        likes: result.isLiked
+          ? [...(story.likes || []), user?._id]
           : (story.likes || []).filter((id: any) => id !== user?._id),
         dislikes: (story.dislikes || []).filter((id: any) => id !== user?._id)
       });
@@ -412,10 +412,10 @@ export default function StoryDetailScreen() {
     if (!story || isMangaDex) return;
     try {
       const result = await api.dislikeStory(story._id);
-      setStory({ 
-        ...story, 
-        dislikes: result.isDisliked 
-          ? [...(story.dislikes || []), user?._id] 
+      setStory({
+        ...story,
+        dislikes: result.isDisliked
+          ? [...(story.dislikes || []), user?._id]
           : (story.dislikes || []).filter((id: any) => id !== user?._id),
         likes: (story.likes || []).filter((id: any) => id !== user?._id)
       });
@@ -427,39 +427,39 @@ export default function StoryDetailScreen() {
   const handleToggleFavorite = async () => {
     let storyId = story?._id;
     if (!storyId && isMangaDex) {
-        // Clone if it's MangaDex
-        try {
-            setIsLoading(true);
-            const result = await api.cloneMangaDex({
-                mangadexId: story.mangadexId || id,
-                title: story.title,
-                description: story.description,
-                coverImage: story.coverImage,
-                author: story.author,
-                status: story.status,
-                totalChapters: story.totalChapters ? String(story.totalChapters) : undefined,
-                genres: story.genres,
-                year: story.year,
-            });
-            storyId = result.story._id;
-            setStory(result.story);
-            setIsMangaDex(false);
-        } catch (e: any) {
-            showToast({ message: e.message || 'Failed to clone story', type: 'error' });
-            return;
-        } finally {
-            setIsLoading(false);
-        }
+      // Clone if it's MangaDex
+      try {
+        setIsLoading(true);
+        const result = await api.cloneMangaDex({
+          mangadexId: story.mangadexId || id,
+          title: story.title,
+          description: story.description,
+          coverImage: story.coverImage,
+          author: story.author,
+          status: story.status,
+          totalChapters: story.totalChapters ? String(story.totalChapters) : undefined,
+          genres: story.genres,
+          year: story.year,
+        });
+        storyId = result.story._id;
+        setStory(result.story);
+        setIsMangaDex(false);
+      } catch (e: any) {
+        showToast({ message: e.message || 'Failed to clone story', type: 'error' });
+        return;
+      } finally {
+        setIsLoading(false);
+      }
     }
-    
+
     if (!storyId) return;
 
     try {
       const result = await api.toggleFavorite(storyId);
       setProgress(progress ? { ...progress, isFavorite: result.isFavorite } : { isFavorite: result.isFavorite, status: 'Plan to Read', currentChapter: 0 });
-      showToast({ 
-        message: result.isFavorite ? 'Added to favorites' : 'Removed from favorites', 
-        type: 'success' 
+      showToast({
+        message: result.isFavorite ? 'Added to favorites' : 'Removed from favorites',
+        type: 'success'
       });
     } catch (error: any) {
       showToast({ message: error.message, type: 'error' });
@@ -536,608 +536,635 @@ export default function StoryDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView 
-          showsVerticalScrollIndicator={false} 
+        <ScrollView
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-        <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <IconSymbol name="arrow.left" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerMoreBtn} 
-            onPress={() => setShowManageModal(true)}>
-            <IconSymbol name="ellipsis" size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <IconSymbol name="arrow.left" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerMoreBtn}
+              onPress={() => setShowManageModal(true)}>
+              <IconSymbol name="ellipsis" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
 
-        {/* Cover & Info */}
-        <View style={styles.heroSection}>
-          {story.coverImage ? (
-            <Image source={{ uri: story.coverImage }} style={styles.heroCover} contentFit="cover" />
-          ) : (
-            <View style={[styles.heroCover, styles.placeholder, { backgroundColor: colors.surfaceElevated }]}>
-              <IconSymbol name="book.fill" size={64} color={colors.textSecondary} />
+          {/* Cover & Info */}
+          <View style={styles.heroSection}>
+            {story.coverImage ? (
+              <Image source={{ uri: story.coverImage }} style={styles.heroCover} contentFit="cover" />
+            ) : (
+              <View style={[styles.heroCover, styles.placeholder, { backgroundColor: colors.surfaceElevated }]}>
+                <IconSymbol name="book.fill" size={64} color={colors.textSecondary} />
+              </View>
+            )}
+
+            <View style={styles.heroInfo}>
+              <Text style={[styles.storyTitle, { color: colors.text }]}>{story.title}</Text>
+              <Text style={[styles.storyAuthor, { color: colors.textSecondary }]}>
+                {story.author || 'Unknown Author'}
+              </Text>
+
+              <View style={styles.metaRow}>
+                <View style={[styles.typeBadge, { backgroundColor: colors.primary + '20' }]}>
+                  <Text style={[styles.typeText, { color: colors.primary }]}>{story.type || 'Manga'}</Text>
+                </View>
+                {story.year ? (
+                  <Text style={[styles.yearLabel, { color: colors.textSecondary }]}>{story.year}</Text>
+                ) : null}
+                {story.averageRating > 0 && (
+                  <View style={styles.ratingRow}>
+                    <IconSymbol name="star.fill" size={14} color={colors.accent} />
+                    <Text style={[styles.ratingValue, { color: colors.text }]}>
+                      {story.averageRating.toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.ratingRow}>
+                  <IconSymbol name="eye.fill" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.ratingValue, { color: colors.textSecondary }]}>
+                    {story.views || 0}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.metaRow}>
+                <View style={[styles.statusPill, { backgroundColor: (StatusColors[statusLabel] || colors.primary) + '20' }]}>
+                  <Text style={[styles.statusPillText, { color: StatusColors[statusLabel] || colors.primary }]}>{statusLabel}</Text>
+                </View>
+                {story.totalChapters ? (
+                  <Text style={[styles.chapterMeta, { color: colors.textSecondary }]}>
+                    {story.totalChapters} chapters
+                  </Text>
+                ) : null}
+              </View>
+
+              {story.genres?.length > 0 && (
+                <View style={styles.genreRow}>
+                  {story.genres.slice(0, 5).map((genre: string) => (
+                    <View key={genre} style={[styles.genreChip, { backgroundColor: colors.surfaceElevated }]}>
+                      <Text style={[styles.genreText, { color: colors.textSecondary }]}>{genre}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+
+          {(user?.role === 'VIPcr' || user?.role === 'admin') && (story.mangadexId || isMangaDex) && (
+            <TouchableOpacity
+              style={[
+                styles.readBtnVIP, 
+                { 
+                  backgroundColor: colors.accent, 
+                  marginBottom: Spacing.md, 
+                  paddingHorizontal: Spacing.lg,
+                  borderRadius: 16,
+                  shadowColor: colors.accent,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 5
+                }
+              ]}
+              onPress={() => router.push(`/reader/${story._id || id}?mangadexId=${story.mangadexId || id}` as any)}
+            >
+              <IconSymbol name="play.fill" size={20} color="#FFF" />
+              <Text style={styles.readBtnVIPText}>
+                {progress?.currentChapter > 0 
+                  ? `Continue Reading Ch. ${progress.currentChapter}` 
+                  : 'Start Reading'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: progress ? colors.surfaceElevated : colors.primary, flex: 2 }]}
+              onPress={handleAddToLibrary}
+              disabled={!!progress}>
+              <IconSymbol
+                name={progress ? "checkmark.circle.fill" : "plus"}
+                size={16}
+                color={progress ? colors.success : "#FFF"}
+              />
+              <Text style={[styles.actionBtnText, { color: progress ? colors.success : "#FFF" }]}>
+                {progress ? 'In Your Library' : 'Add to Library'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtnOutline, { borderColor: progress?.isFavorite ? colors.error : colors.primary, flex: 1, marginLeft: Spacing.sm }]}
+              onPress={handleToggleFavorite}>
+              <IconSymbol
+                name={progress?.isFavorite ? "heart.fill" : "heart"}
+                size={18}
+                color={progress?.isFavorite ? colors.error : colors.primary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtnOutline, { borderColor: colors.primary }]}
+              onPress={() => setShowCollPicker(!showCollPicker)}>
+              <IconSymbol name="folder.fill" size={16} color={colors.primary} />
+              <Text style={[styles.actionBtnOutlineText, { color: colors.primary }]}>Collection</Text>
+            </TouchableOpacity>
+
+            <View style={[styles.voteGroup, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <TouchableOpacity
+                style={[
+                  styles.voteBtn,
+                  story.likes?.includes(user?._id) && { backgroundColor: colors.success + '20' }
+                ]}
+                onPress={handleLike}>
+                <IconSymbol
+                  name={story.likes?.includes(user?._id) ? "hand.thumbsup.fill" : "hand.thumbsup"}
+                  size={16}
+                  color={story.likes?.includes(user?._id) ? colors.success : colors.textSecondary}
+                />
+                <Text style={[
+                  styles.voteText,
+                  { color: story.likes?.includes(user?._id) ? colors.success : colors.textSecondary }
+                ]}>
+                  {story.likes?.length || 0}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={[styles.voteDivider, { backgroundColor: colors.border }]} />
+
+              <TouchableOpacity
+                style={[
+                  styles.voteBtn,
+                  story.dislikes?.includes(user?._id) && { backgroundColor: colors.error + '20' }
+                ]}
+                onPress={handleDislike}>
+                <IconSymbol
+                  name={story.dislikes?.includes(user?._id) ? "hand.thumbsdown.fill" : "hand.thumbsdown"}
+                  size={16}
+                  color={story.dislikes?.includes(user?._id) ? colors.error : colors.textSecondary}
+                />
+                <Text style={[
+                  styles.voteText,
+                  { color: story.dislikes?.includes(user?._id) ? colors.error : colors.textSecondary }
+                ]}>
+                  {story.dislikes?.length || 0}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {!isMangaDex && (
+            <View style={[styles.section, { marginTop: -Spacing.sm, paddingHorizontal: Spacing.lg }]}>
+              <TouchableOpacity
+                style={[
+                  styles.actionBtnOutline,
+                  { borderColor: isRecommended ? colors.accent : colors.primary, width: '100%', marginBottom: showRecoInput ? Spacing.sm : 0 }
+                ]}
+                onPress={confirmRecommend}>
+                <IconSymbol
+                  name={isRecommended ? "star.fill" : "star"}
+                  size={16}
+                  color={isRecommended ? colors.accent : colors.primary}
+                />
+                <Text style={[
+                  styles.actionBtnOutlineText,
+                  { color: isRecommended ? colors.accent : colors.primary, marginLeft: Spacing.xs }
+                ]}>
+                  {isRecommended ? 'Recommended' : 'Recommend to Friends'}
+                </Text>
+              </TouchableOpacity>
+
+              {showRecoInput && (
+                <View style={[styles.recoInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <TextInput
+                    style={[styles.recoTextInput, { color: colors.text }]}
+                    placeholder="Add a message (optional)..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={recoMessage}
+                    onChangeText={setRecoMessage}
+                    multiline
+                  />
+                  <View style={styles.recoActionRow}>
+                    <TouchableOpacity
+                      style={[styles.recoCancelBtn, { borderColor: colors.border }]}
+                      onPress={() => setShowRecoInput(false)}>
+                      <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.recoConfirmBtn, { backgroundColor: colors.accent }]}
+                      onPress={() => handleRecommend()}>
+                      <Text style={{ color: '#FFF', fontWeight: '700' }}>Confirm</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
           )}
 
-          <View style={styles.heroInfo}>
-            <Text style={[styles.storyTitle, { color: colors.text }]}>{story.title}</Text>
-            <Text style={[styles.storyAuthor, { color: colors.textSecondary }]}>
-              {story.author || 'Unknown Author'}
-            </Text>
-
-            <View style={styles.metaRow}>
-              <View style={[styles.typeBadge, { backgroundColor: colors.primary + '20' }]}>
-                <Text style={[styles.typeText, { color: colors.primary }]}>{story.type || 'Manga'}</Text>
-              </View>
-              {story.year ? (
-                <Text style={[styles.yearLabel, { color: colors.textSecondary }]}>{story.year}</Text>
-              ) : null}
-              {story.averageRating > 0 && (
-                <View style={styles.ratingRow}>
-                  <IconSymbol name="star.fill" size={14} color={colors.accent} />
-                  <Text style={[styles.ratingValue, { color: colors.text }]}>
-                    {story.averageRating.toFixed(1)}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.ratingRow}>
-                <IconSymbol name="eye.fill" size={14} color={colors.textSecondary} />
-                <Text style={[styles.ratingValue, { color: colors.textSecondary }]}>
-                  {story.views || 0}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.metaRow}>
-              <View style={[styles.statusPill, { backgroundColor: (StatusColors[statusLabel] || colors.primary) + '20' }]}>
-                <Text style={[styles.statusPillText, { color: StatusColors[statusLabel] || colors.primary }]}>{statusLabel}</Text>
-              </View>
-              {story.totalChapters ? (
-                <Text style={[styles.chapterMeta, { color: colors.textSecondary }]}>
-                  {story.totalChapters} chapters
-                </Text>
-              ) : null}
-            </View>
-
-            {story.genres?.length > 0 && (
-              <View style={styles.genreRow}>
-                {story.genres.slice(0, 5).map((genre: string) => (
-                  <View key={genre} style={[styles.genreChip, { backgroundColor: colors.surfaceElevated }]}>
-                    <Text style={[styles.genreText, { color: colors.textSecondary }]}>{genre}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: progress ? colors.surfaceElevated : colors.primary, flex: 2 }]}
-            onPress={handleAddToLibrary}
-            disabled={!!progress}>
-            <IconSymbol 
-              name={progress ? "checkmark.circle.fill" : "plus"} 
-              size={16} 
-              color={progress ? colors.success : "#FFF"} 
-            />
-            <Text style={[styles.actionBtnText, { color: progress ? colors.success : "#FFF" }]}>
-              {progress ? 'In Your Library' : 'Add to Library'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtnOutline, { borderColor: progress?.isFavorite ? colors.error : colors.primary, flex: 1, marginLeft: Spacing.sm }]}
-            onPress={handleToggleFavorite}>
-            <IconSymbol 
-                name={progress?.isFavorite ? "heart.fill" : "heart"} 
-                size={18} 
-                color={progress?.isFavorite ? colors.error : colors.primary} 
-            />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionBtnOutline, { borderColor: colors.primary }]}
-            onPress={() => setShowCollPicker(!showCollPicker)}>
-            <IconSymbol name="folder.fill" size={16} color={colors.primary} />
-            <Text style={[styles.actionBtnOutlineText, { color: colors.primary }]}>Collection</Text>
-          </TouchableOpacity>
-          
-          <View style={[styles.voteGroup, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-            <TouchableOpacity
-              style={[
-                styles.voteBtn, 
-                story.likes?.includes(user?._id) && { backgroundColor: colors.success + '20' }
-              ]}
-              onPress={handleLike}>
-              <IconSymbol 
-                name={story.likes?.includes(user?._id) ? "hand.thumbsup.fill" : "hand.thumbsup"} 
-                size={16} 
-                color={story.likes?.includes(user?._id) ? colors.success : colors.textSecondary} 
-              />
-              <Text style={[
-                styles.voteText, 
-                { color: story.likes?.includes(user?._id) ? colors.success : colors.textSecondary }
-              ]}>
-                {story.likes?.length || 0}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={[styles.voteDivider, { backgroundColor: colors.border }]} />
-
-            <TouchableOpacity
-              style={[
-                styles.voteBtn, 
-                story.dislikes?.includes(user?._id) && { backgroundColor: colors.error + '20' }
-              ]}
-              onPress={handleDislike}>
-              <IconSymbol 
-                name={story.dislikes?.includes(user?._id) ? "hand.thumbsdown.fill" : "hand.thumbsdown"} 
-                size={16} 
-                color={story.dislikes?.includes(user?._id) ? colors.error : colors.textSecondary} 
-              />
-              <Text style={[
-                styles.voteText, 
-                { color: story.dislikes?.includes(user?._id) ? colors.error : colors.textSecondary }
-              ]}>
-                {story.dislikes?.length || 0}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {!isMangaDex && (
-          <View style={[styles.section, { marginTop: -Spacing.sm, paddingHorizontal: Spacing.lg }]}>
-            <TouchableOpacity
-              style={[
-                styles.actionBtnOutline, 
-                { borderColor: isRecommended ? colors.accent : colors.primary, width: '100%', marginBottom: showRecoInput ? Spacing.sm : 0 }
-              ]}
-              onPress={confirmRecommend}>
-              <IconSymbol 
-                name={isRecommended ? "star.fill" : "star"} 
-                size={16} 
-                color={isRecommended ? colors.accent : colors.primary} 
-              />
-              <Text style={[
-                styles.actionBtnOutlineText, 
-                { color: isRecommended ? colors.accent : colors.primary, marginLeft: Spacing.xs }
-              ]}>
-                {isRecommended ? 'Recommended' : 'Recommend to Friends'}
-              </Text>
-            </TouchableOpacity>
-
-            {showRecoInput && (
-              <View style={[styles.recoInputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <TextInput
-                  style={[styles.recoTextInput, { color: colors.text }]}
-                  placeholder="Add a message (optional)..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={recoMessage}
-                  onChangeText={setRecoMessage}
-                  multiline
-                />
-                <View style={styles.recoActionRow}>
-                  <TouchableOpacity 
-                    style={[styles.recoCancelBtn, { borderColor: colors.border }]} 
-                    onPress={() => setShowRecoInput(false)}>
-                    <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.recoConfirmBtn, { backgroundColor: colors.accent }]} 
-                    onPress={() => handleRecommend()}>
-                    <Text style={{ color: '#FFF', fontWeight: '700' }}>Confirm</Text>
-                  </TouchableOpacity>
+          {/* Friends' Progress Section — Comparison Mode */}
+          {!isMangaDex && friendsProgress.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <IconSymbol name="person.2.fill" size={18} color={colors.text} />
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Friends Progress</Text>
                 </View>
               </View>
-            )}
-          </View>
-        )}
 
-        {/* Friends' Progress Section — Comparison Mode */}
-        {!isMangaDex && friendsProgress.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <IconSymbol name="person.2.fill" size={18} color={colors.text} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Friends Progress</Text>
-              </View>
-            </View>
-            
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendsProgressScroll}>
-              {friendsProgress.map((fp) => {
-                const diff = (fp.currentChapter || 0) - (progress?.currentChapter || 0);
-                return (
-                  <View key={fp._id} style={[styles.friendProgressCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                    {fp.user?.avatar ? (
-                      <Image source={{ uri: fp.user.avatar }} style={styles.friendAvatar} contentFit="cover" />
-                    ) : (
-                      <View style={[styles.friendAvatar, { backgroundColor: colors.primary + '15' }]}>
-                        <Text style={[styles.avatarLetter, { color: colors.primary, fontSize: 14 }]}>
-                          {fp.user?.username?.[0]?.toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={styles.friendMeta}>
-                      <Text style={[styles.friendName, { color: colors.text }]} numberOfLines={1}>
-                        {fp.user?.username}
-                      </Text>
-                      <View style={styles.friendSubMeta}>
-                        <Text style={[styles.friendProgressText, { color: colors.primary }]}>
-                          Ch. {fp.currentChapter}
-                        </Text>
-                        {progress && diff !== 0 && (
-                          <Text style={[styles.diffIndicator, { color: diff > 0 ? '#10B981' : '#EF4444' }]}>
-                            ({diff > 0 ? `+${diff}` : diff})
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.friendsProgressScroll}>
+                {friendsProgress.map((fp) => {
+                  const diff = (fp.currentChapter || 0) - (progress?.currentChapter || 0);
+                  return (
+                    <View key={fp._id} style={[styles.friendProgressCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                      {fp.user?.avatar ? (
+                        <Image source={{ uri: fp.user.avatar }} style={styles.friendAvatar} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.friendAvatar, { backgroundColor: colors.primary + '15' }]}>
+                          <Text style={[styles.avatarLetter, { color: colors.primary, fontSize: 14 }]}>
+                            {fp.user?.username?.[0]?.toUpperCase()}
                           </Text>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-        {/* Collection Picker */}
-        {showCollPicker && (
-          <View style={[styles.collPicker, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-            {collections.length === 0 ? (
-              <Text style={[styles.noCollText, { color: colors.textSecondary }]}>No collections yet</Text>
-            ) : (
-              collections.map((coll) => (
-                <TouchableOpacity
-                  key={coll._id}
-                  style={[styles.collItem, { borderColor: colors.border }]}
-                  onPress={() => handleAddToCollection(coll._id)}>
-                  <View style={[styles.collDot, { backgroundColor: coll.color || colors.primary }]} />
-                  <Text style={[styles.collItemText, { color: colors.text }]}>{coll.name}</Text>
-                  <Text style={[styles.collItemCount, { color: colors.textSecondary }]}>{coll.stories?.length || 0}</Text>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* Description */}
-        {story.description ? (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Description</Text>
-            <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>
-              {story.description}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Reading Progress — only for local stories */}
-        {!isMangaDex && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <IconSymbol name="book.fill" size={18} color={colors.text} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Progress</Text>
-              </View>
-            </View>
-
-            {!progress ? (
-              <TouchableOpacity
-                style={[styles.addToLibraryBtn, { backgroundColor: colors.primary }]}
-                onPress={handleAddToLibrary}>
-                <IconSymbol name="plus" size={20} color="#FFF" />
-                <Text style={styles.addToLibraryText}>Add to Library</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.compactProgressCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                {/* Top Bar: Status & Edit Toggle */}
-                <View style={styles.cardHeader}>
-                  <TouchableOpacity 
-                    style={[styles.statusDropdown, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]} 
-                    onPress={() => setShowStatusPicker(!showStatusPicker)}>
-                    <View style={[styles.statusIndicator, { backgroundColor: StatusColors[progress.status] || colors.primary }]} />
-                    <Text style={[styles.currentStatusText, { color: colors.text }]}>{progress.status}</Text>
-                    <IconSymbol name={showStatusPicker ? "chevron.up" : "chevron.down"} size={14} color={colors.textSecondary} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={[styles.miniEditBtn, isEditingProgress && { backgroundColor: colors.primary }]} 
-                    onPress={() => setIsEditingProgress(!isEditingProgress)}>
-                    <IconSymbol name={isEditingProgress ? "xmark" : "pencil"} size={14} color={isEditingProgress ? "#FFF" : colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Expanded Status Picker */}
-                {showStatusPicker && (
-                  <View style={styles.statusPickerGrid}>
-                    {['Reading', 'Completed', 'Plan to Read', 'On Hold', 'Dropped'].map((s) => (
-                      <TouchableOpacity
-                        key={s}
-                        style={[
-                          styles.statusPickerItem,
-                          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
-                          progress.status === s && { backgroundColor: (StatusColors[s] || colors.primary) + '15', borderColor: StatusColors[s] || colors.primary }
-                        ]}
-                        onPress={() => {
-                          handleStatusChange(s);
-                          setShowStatusPicker(false);
-                        }}>
-                        <View style={[styles.statusItemSmallDot, { backgroundColor: StatusColors[s] || colors.primary }]} />
-                        <Text style={[
-                          styles.statusPickerText, 
-                          { color: progress.status === s ? (StatusColors[s] || colors.primary) : colors.textSecondary }
-                        ]}>
-                          {s}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Main Counter UI */}
-                <View style={[styles.counterSection, showStatusPicker && { opacity: 0.3 }]}>
-                  <TouchableOpacity
-                    style={[styles.roundActionBtn, { borderColor: colors.border }]}
-                    onPress={handleDecrement}
-                    onPressIn={() => startHold('down')}
-                    onPressOut={stopHold}>
-                    <IconSymbol name="minus" size={24} color={colors.text} />
-                  </TouchableOpacity>
-
-                  <View style={styles.chapterCenter}>
-                    {isEditingProgress ? (
-                      <View style={styles.inlineEditWrapper}>
-                        <TextInput
-                          style={[styles.centeredChapterInput, { color: colors.primary }]}
-                          value={editChapter}
-                          onChangeText={setEditChapter}
-                          keyboardType="numeric"
-                          returnKeyType="done"
-                          autoFocus
-                          selectTextOnFocus
-                          onBlur={handleUpdateManualProgress}
-                          onSubmitEditing={handleUpdateManualProgress}
-                        />
-                      </View>
-                    ) : (
-                      <TouchableOpacity activeOpacity={0.7} onPress={() => setIsEditingProgress(true)} style={{ alignItems: 'center' }}>
-                        <Text style={[styles.bigChapterNumber, { color: colors.text }]}>
-                          {displayedChapter}
-                        </Text>
-                        <Text style={[styles.counterUnit, { color: colors.textSecondary }]}>CHAPTRES</Text>
-                      </TouchableOpacity>
-                    )}
-                    {story.totalChapters && (
-                      <Text style={[styles.totalCountLabel, { color: colors.textSecondary }]}>
-                        / {story.totalChapters}
-                      </Text>
-                    )}
-                  </View>
-
-                  <TouchableOpacity
-                    style={[styles.roundActionBtn, { backgroundColor: colors.primary, ...Shadows.glow }]}
-                    onPress={handleIncrement}
-                    onPressIn={() => startHold('up')}
-                    onPressOut={stopHold}>
-                    <IconSymbol name="plus" size={24} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Slim Progress Bar */}
-                {story.totalChapters > 0 && (
-                  <View style={[styles.slimProgressBar, { backgroundColor: colors.surfaceElevated }]}>
-                    <View
-                      style={[
-                        styles.slimProgressFill,
-                        {
-                          backgroundColor: colors.primary,
-                          width: `${Math.min((displayedChapter / story.totalChapters) * 100, 100)}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Reviews Section — only for local stories */}
-        {!isMangaDex && (
-          <View style={styles.section}>
-            {(() => {
-              const myReview = reviews.find(r => r.user?._id === user?._id);
-              const otherReviews = reviews.filter(r => r.user?._id !== user?._id);
-              const sortedReviews = myReview ? [myReview, ...otherReviews] : reviews;
-
-              return (
-                <>
-                  <View style={styles.sectionHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <IconSymbol name="star.fill" size={18} color={colors.text} />
-                      <Text style={[styles.sectionTitle, { color: colors.text }]}>Reviews</Text>
-                    </View>
-                  </View>
-
-                  {showReviewForm && (
-                    <View style={[styles.reviewForm, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                      <TouchableOpacity 
-                        style={styles.closeReviewForm} 
-                        onPress={() => {
-                          setShowReviewForm(false);
-                          setEditingReviewId(null);
-                          setReviewText('');
-                          setReviewRating(5);
-                        }}>
-                        <IconSymbol name="xmark" size={14} color={colors.textSecondary} />
-                      </TouchableOpacity>
-                      <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>
-                        {editingReviewId ? 'Edit your existing review' : 'Share your opinion about this story'}
-                      </Text>
-                      <View style={styles.starsRow}>
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
-                            <Text style={{ fontSize: 28, color: star <= reviewRating ? colors.accent : colors.textSecondary }}>
-                              ★
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                      <TextInput
-                        style={[styles.reviewInput, { backgroundColor: colors.surfaceElevated, color: colors.text, borderColor: colors.border }]}
-                        placeholder="Share your thoughts..."
-                        placeholderTextColor={colors.textSecondary}
-                        value={reviewText}
-                        onChangeText={setReviewText}
-                        multiline
-                        numberOfLines={3}
-                        textAlignVertical="top"
-                      />
-                      <TouchableOpacity
-                        style={[styles.submitReviewBtn, { backgroundColor: colors.primary }]}
-                        onPress={handleSubmitReview}>
-                        <Text style={styles.submitReviewText}>
-                          {editingReviewId ? 'Update Review' : 'Submit Review'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {!myReview && !showReviewForm && (
-                     <View style={[styles.rateStorySection, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
-                        <View style={{ flex: 1 }}>
-                           <Text style={[styles.rateStoryTitle, { color: colors.text }]}>Rate this story</Text>
-                           <Text style={[styles.rateStorySubtitle, { color: colors.textSecondary }]}>Share your experience with the community</Text>
                         </View>
-                        <TouchableOpacity 
-                           style={[styles.rateStoryBtn, { backgroundColor: colors.primary }]}
-                           onPress={() => setShowReviewForm(true)}>
-                           <IconSymbol name="plus" size={16} color="#FFF" />
-                           <Text style={styles.rateStoryBtnText}>Review</Text>
-                        </TouchableOpacity>
-                     </View>
-                  )}
-
-                  {sortedReviews.length === 0 ? (
-                    <TouchableOpacity 
-                      activeOpacity={0.7}
-                      onPress={() => setShowReviewForm(true)}
-                      style={[styles.emptyBox, { backgroundColor: colors.surfaceElevated }]}>
-                      <IconSymbol name="star" size={32} color={colors.textSecondary} style={{ opacity: 0.3, marginBottom: 12 }} />
-                      <Text style={[styles.noReviews, { color: colors.textSecondary }]}>
-                        No reviews yet. Be the first to share your experience!
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    sortedReviews.map((review) => (
-                      <View
-                        key={review._id}
-                        style={[
-                          styles.premiumReviewCard, 
-                          { backgroundColor: colors.surface, borderColor: colors.cardBorder },
-                          review.user?._id === user?._id && { borderColor: colors.primary + '40', borderWidth: 2 }
-                        ]}>
-                        
-                        {/* Review Header: User Info & Score */}
-                        <View style={styles.reviewHeader}>
-                          <View style={styles.reviewUserInfo}>
-                            {review.user?.avatar ? (
-                              <Image source={{ uri: review.user.avatar }} style={styles.premiumAvatar} contentFit="cover" />
-                            ) : (
-                              <View style={[styles.premiumAvatar, { backgroundColor: colors.primary + '15' }]}>
-                                <Text style={[styles.avatarLetter, { color: colors.primary }]}>
-                                  {review.user?.username?.[0]?.toUpperCase()}
-                                </Text>
-                              </View>
-                            )}
-                            <View style={styles.userMeta}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={[styles.reviewUserName, { color: colors.text }]}>
-                                  {review.user?.username}
-                                </Text>
-                                {review.user?._id === user?._id && (
-                                  <View style={[styles.myReviewBadge, { backgroundColor: colors.primary + '20' }]}>
-                                    <Text style={[styles.myReviewBadgeText, { color: colors.primary }]}>YOU</Text>
-                                  </View>
-                                )}
-                              </View>
-                              <View style={styles.ratingBadge}>
-                                <IconSymbol name="star.fill" size={10} color={colors.accent} />
-                                <Text style={[styles.ratingText, { color: colors.accent }]}>{review.rating}/5</Text>
-                              </View>
-                            </View>
-                          </View>
-
-                          {/* Manage Actions (If Owner) */}
-                          {review.user?._id === user?._id && (
-                            <View style={styles.reviewActionGroup}>
-                              <TouchableOpacity 
-                                style={styles.reviewIconButton} 
-                                onPress={() => handleEditReview(review)}>
-                                <IconSymbol name="pencil" size={14} color={colors.textSecondary} />
-                              </TouchableOpacity>
-                              <TouchableOpacity 
-                                style={styles.reviewIconButton} 
-                                onPress={() => {
-                                  setReviewToDelete(review._id);
-                                  setShowDeleteConfirm(true);
-                                }}>
-                                <IconSymbol name="trash" size={14} color="#FF4444" />
-                              </TouchableOpacity>
-                            </View>
+                      )}
+                      <View style={styles.friendMeta}>
+                        <Text style={[styles.friendName, { color: colors.text }]} numberOfLines={1}>
+                          {fp.user?.username}
+                        </Text>
+                        <View style={styles.friendSubMeta}>
+                          <Text style={[styles.friendProgressText, { color: colors.primary }]}>
+                            Ch. {fp.currentChapter}
+                          </Text>
+                          {progress && diff !== 0 && (
+                            <Text style={[styles.diffIndicator, { color: diff > 0 ? '#10B981' : '#EF4444' }]}>
+                              ({diff > 0 ? `+${diff}` : diff})
+                            </Text>
                           )}
                         </View>
-
-                        {/* Review Body */}
-                        {review.text ? (
-                          <Text style={[styles.premiumReviewBody, { color: colors.textSecondary }]}>
-                            {review.text}
-                          </Text>
-                        ) : (
-                          <Text style={[styles.premiumReviewBody, { color: colors.textSecondary, fontStyle: 'italic', opacity: 0.5 }]}>
-                            No comments provided.
-                          </Text>
-                        )}
-
-                        {/* Social Footer: Likes & Interaction */}
-                        <View style={[styles.reviewFooter, { borderTopColor: colors.border + '30' }]}>
-                          <TouchableOpacity 
-                            style={[
-                              styles.socialAction,
-                              review.likes?.includes(user?._id) && { backgroundColor: colors.primary + '15' }
-                            ]}
-                            onPress={() => handleLikeReview(review._id)}>
-                            <IconSymbol 
-                              name={review.likes?.includes(user?._id) ? "hand.thumbsup.fill" : "hand.thumbsup"} 
-                              size={14} 
-                              color={review.likes?.includes(user?._id) ? colors.primary : colors.textSecondary} 
-                            />
-                            <Text style={[
-                              styles.socialCount, 
-                              { color: review.likes?.includes(user?._id) ? colors.primary : colors.textSecondary }
-                            ]}>
-                              {review.likes?.length || 0} Helpful
-                            </Text>
-                          </TouchableOpacity>
-
-                          <Text style={[styles.reviewTime, { color: colors.textSecondary }]}>
-                            {new Date(review.createdAt).toLocaleDateString()}
-                          </Text>
-                        </View>
                       </View>
-                    ))
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+          {/* Collection Picker */}
+          {showCollPicker && (
+            <View style={[styles.collPicker, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              {collections.length === 0 ? (
+                <Text style={[styles.noCollText, { color: colors.textSecondary }]}>No collections yet</Text>
+              ) : (
+                collections.map((coll) => (
+                  <TouchableOpacity
+                    key={coll._id}
+                    style={[styles.collItem, { borderColor: colors.border }]}
+                    onPress={() => handleAddToCollection(coll._id)}>
+                    <View style={[styles.collDot, { backgroundColor: coll.color || colors.primary }]} />
+                    <Text style={[styles.collItemText, { color: colors.text }]}>{coll.name}</Text>
+                    <Text style={[styles.collItemCount, { color: colors.textSecondary }]}>{coll.stories?.length || 0}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
+          )}
+
+          {/* Description */}
+          {story.description ? (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Description</Text>
+              <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>
+                {story.description}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Reading Progress — only for local stories */}
+          {!isMangaDex && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <IconSymbol name="book.fill" size={18} color={colors.text} />
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Progress</Text>
+                </View>
+              </View>
+
+              {!progress ? (
+                <TouchableOpacity
+                  style={[styles.addToLibraryBtn, { backgroundColor: colors.primary }]}
+                  onPress={handleAddToLibrary}>
+                  <IconSymbol name="plus" size={20} color="#FFF" />
+                  <Text style={styles.addToLibraryText}>Add to Library</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.compactProgressCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                  {/* Top Bar: Status & Edit Toggle */}
+                  <View style={styles.cardHeader}>
+                    <TouchableOpacity
+                      style={[styles.statusDropdown, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
+                      onPress={() => setShowStatusPicker(!showStatusPicker)}>
+                      <View style={[styles.statusIndicator, { backgroundColor: StatusColors[progress.status] || colors.primary }]} />
+                      <Text style={[styles.currentStatusText, { color: colors.text }]}>{progress.status}</Text>
+                      <IconSymbol name={showStatusPicker ? "chevron.up" : "chevron.down"} size={14} color={colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.miniEditBtn, isEditingProgress && { backgroundColor: colors.primary }]}
+                      onPress={() => setIsEditingProgress(!isEditingProgress)}>
+                      <IconSymbol name={isEditingProgress ? "xmark" : "pencil"} size={14} color={isEditingProgress ? "#FFF" : colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Expanded Status Picker */}
+                  {showStatusPicker && (
+                    <View style={styles.statusPickerGrid}>
+                      {['Reading', 'Completed', 'Plan to Read', 'On Hold', 'Dropped'].map((s) => (
+                        <TouchableOpacity
+                          key={s}
+                          style={[
+                            styles.statusPickerItem,
+                            { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                            progress.status === s && { backgroundColor: (StatusColors[s] || colors.primary) + '15', borderColor: StatusColors[s] || colors.primary }
+                          ]}
+                          onPress={() => {
+                            handleStatusChange(s);
+                            setShowStatusPicker(false);
+                          }}>
+                          <View style={[styles.statusItemSmallDot, { backgroundColor: StatusColors[s] || colors.primary }]} />
+                          <Text style={[
+                            styles.statusPickerText,
+                            { color: progress.status === s ? (StatusColors[s] || colors.primary) : colors.textSecondary }
+                          ]}>
+                            {s}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   )}
-                </>
-              );
-            })()}
-          </View>
-        )}
+
+                  {/* Main Counter UI */}
+                  <View style={[styles.counterSection, showStatusPicker && { opacity: 0.3 }]}>
+                    <TouchableOpacity
+                      style={[styles.roundActionBtn, { borderColor: colors.border }]}
+                      onPress={handleDecrement}
+                      onPressIn={() => startHold('down')}
+                      onPressOut={stopHold}>
+                      <IconSymbol name="minus" size={24} color={colors.text} />
+                    </TouchableOpacity>
+
+                    <View style={styles.chapterCenter}>
+                      {isEditingProgress ? (
+                        <View style={styles.inlineEditWrapper}>
+                          <TextInput
+                            style={[styles.centeredChapterInput, { color: colors.primary }]}
+                            value={editChapter}
+                            onChangeText={setEditChapter}
+                            keyboardType="numeric"
+                            returnKeyType="done"
+                            autoFocus
+                            selectTextOnFocus
+                            onBlur={handleUpdateManualProgress}
+                            onSubmitEditing={handleUpdateManualProgress}
+                          />
+                        </View>
+                      ) : (
+                        <TouchableOpacity activeOpacity={0.7} onPress={() => setIsEditingProgress(true)} style={{ alignItems: 'center' }}>
+                          <Text style={[styles.bigChapterNumber, { color: colors.text }]}>
+                            {displayedChapter}
+                          </Text>
+                          <Text style={[styles.counterUnit, { color: colors.textSecondary }]}>CHAPTRES</Text>
+                        </TouchableOpacity>
+                      )}
+                      {story.totalChapters && (
+                        <Text style={[styles.totalCountLabel, { color: colors.textSecondary }]}>
+                          / {story.totalChapters}
+                        </Text>
+                      )}
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.roundActionBtn, { backgroundColor: colors.primary, ...Shadows.glow }]}
+                      onPress={handleIncrement}
+                      onPressIn={() => startHold('up')}
+                      onPressOut={stopHold}>
+                      <IconSymbol name="plus" size={24} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Slim Progress Bar */}
+                  {story.totalChapters > 0 && (
+                    <View style={[styles.slimProgressBar, { backgroundColor: colors.surfaceElevated }]}>
+                      <View
+                        style={[
+                          styles.slimProgressFill,
+                          {
+                            backgroundColor: colors.primary,
+                            width: `${Math.min((displayedChapter / story.totalChapters) * 100, 100)}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Reviews Section — only for local stories */}
+          {!isMangaDex && (
+            <View style={styles.section}>
+              {(() => {
+                const myReview = reviews.find(r => r.user?._id === user?._id);
+                const otherReviews = reviews.filter(r => r.user?._id !== user?._id);
+                const sortedReviews = myReview ? [myReview, ...otherReviews] : reviews;
+
+                return (
+                  <>
+                    <View style={styles.sectionHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <IconSymbol name="star.fill" size={18} color={colors.text} />
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Reviews</Text>
+                      </View>
+                    </View>
+
+                    {showReviewForm && (
+                      <View style={[styles.reviewForm, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                        <TouchableOpacity
+                          style={styles.closeReviewForm}
+                          onPress={() => {
+                            setShowReviewForm(false);
+                            setEditingReviewId(null);
+                            setReviewText('');
+                            setReviewRating(5);
+                          }}>
+                          <IconSymbol name="xmark" size={14} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                        <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>
+                          {editingReviewId ? 'Edit your existing review' : 'Share your opinion about this story'}
+                        </Text>
+                        <View style={styles.starsRow}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+                              <Text style={{ fontSize: 28, color: star <= reviewRating ? colors.accent : colors.textSecondary }}>
+                                ★
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                        <TextInput
+                          style={[styles.reviewInput, { backgroundColor: colors.surfaceElevated, color: colors.text, borderColor: colors.border }]}
+                          placeholder="Share your thoughts..."
+                          placeholderTextColor={colors.textSecondary}
+                          value={reviewText}
+                          onChangeText={setReviewText}
+                          multiline
+                          numberOfLines={3}
+                          textAlignVertical="top"
+                        />
+                        <TouchableOpacity
+                          style={[styles.submitReviewBtn, { backgroundColor: colors.primary }]}
+                          onPress={handleSubmitReview}>
+                          <Text style={styles.submitReviewText}>
+                            {editingReviewId ? 'Update Review' : 'Submit Review'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {!myReview && !showReviewForm && (
+                      <View style={[styles.rateStorySection, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.rateStoryTitle, { color: colors.text }]}>Rate this story</Text>
+                          <Text style={[styles.rateStorySubtitle, { color: colors.textSecondary }]}>Share your experience with the community</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.rateStoryBtn, { backgroundColor: colors.primary }]}
+                          onPress={() => setShowReviewForm(true)}>
+                          <IconSymbol name="plus" size={16} color="#FFF" />
+                          <Text style={styles.rateStoryBtnText}>Review</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {sortedReviews.length === 0 ? (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setShowReviewForm(true)}
+                        style={[styles.emptyBox, { backgroundColor: colors.surfaceElevated }]}>
+                        <IconSymbol name="star" size={32} color={colors.textSecondary} style={{ opacity: 0.3, marginBottom: 12 }} />
+                        <Text style={[styles.noReviews, { color: colors.textSecondary }]}>
+                          No reviews yet. Be the first to share your experience!
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      sortedReviews.map((review) => (
+                        <View
+                          key={review._id}
+                          style={[
+                            styles.premiumReviewCard,
+                            { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+                            review.user?._id === user?._id && { borderColor: colors.primary + '40', borderWidth: 2 }
+                          ]}>
+
+                          {/* Review Header: User Info & Score */}
+                          <View style={styles.reviewHeader}>
+                            <View style={styles.reviewUserInfo}>
+                              {review.user?.avatar ? (
+                                <Image source={{ uri: review.user.avatar }} style={styles.premiumAvatar} contentFit="cover" />
+                              ) : (
+                                <View style={[styles.premiumAvatar, { backgroundColor: colors.primary + '15' }]}>
+                                  <Text style={[styles.avatarLetter, { color: colors.primary }]}>
+                                    {review.user?.username?.[0]?.toUpperCase()}
+                                  </Text>
+                                </View>
+                              )}
+                              <View style={styles.userMeta}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Text style={[styles.reviewUserName, { color: colors.text }]}>
+                                    {review.user?.username}
+                                  </Text>
+                                  {review.user?._id === user?._id && (
+                                    <View style={[styles.myReviewBadge, { backgroundColor: colors.primary + '20' }]}>
+                                      <Text style={[styles.myReviewBadgeText, { color: colors.primary }]}>YOU</Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <View style={styles.ratingBadge}>
+                                  <IconSymbol name="star.fill" size={10} color={colors.accent} />
+                                  <Text style={[styles.ratingText, { color: colors.accent }]}>{review.rating}/5</Text>
+                                </View>
+                              </View>
+                            </View>
+
+                            {/* Manage Actions (If Owner) */}
+                            {review.user?._id === user?._id && (
+                              <View style={styles.reviewActionGroup}>
+                                <TouchableOpacity
+                                  style={styles.reviewIconButton}
+                                  onPress={() => handleEditReview(review)}>
+                                  <IconSymbol name="pencil" size={14} color={colors.textSecondary} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.reviewIconButton}
+                                  onPress={() => {
+                                    setReviewToDelete(review._id);
+                                    setShowDeleteConfirm(true);
+                                  }}>
+                                  <IconSymbol name="trash" size={14} color="#FF4444" />
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+
+                          {/* Review Body */}
+                          {review.text ? (
+                            <Text style={[styles.premiumReviewBody, { color: colors.textSecondary }]}>
+                              {review.text}
+                            </Text>
+                          ) : (
+                            <Text style={[styles.premiumReviewBody, { color: colors.textSecondary, fontStyle: 'italic', opacity: 0.5 }]}>
+                              No comments provided.
+                            </Text>
+                          )}
+
+                          {/* Social Footer: Likes & Interaction */}
+                          <View style={[styles.reviewFooter, { borderTopColor: colors.border + '30' }]}>
+                            <TouchableOpacity
+                              style={[
+                                styles.socialAction,
+                                review.likes?.includes(user?._id) && { backgroundColor: colors.primary + '15' }
+                              ]}
+                              onPress={() => handleLikeReview(review._id)}>
+                              <IconSymbol
+                                name={review.likes?.includes(user?._id) ? "hand.thumbsup.fill" : "hand.thumbsup"}
+                                size={14}
+                                color={review.likes?.includes(user?._id) ? colors.primary : colors.textSecondary}
+                              />
+                              <Text style={[
+                                styles.socialCount,
+                                { color: review.likes?.includes(user?._id) ? colors.primary : colors.textSecondary }
+                              ]}>
+                                {review.likes?.length || 0} Helpful
+                              </Text>
+                            </TouchableOpacity>
+
+                            <Text style={[styles.reviewTime, { color: colors.textSecondary }]}>
+                              {new Date(review.createdAt).toLocaleDateString()}
+                            </Text>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </>
+                );
+              })()}
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -1157,10 +1184,10 @@ export default function StoryDetailScreen() {
       {/* Management Options Modal */}
       {showManageModal && (
         <View style={StyleSheet.absoluteFill}>
-          <TouchableOpacity 
-            activeOpacity={1} 
-            style={styles.modalOverlay} 
-            onPress={() => setShowManageModal(false)} 
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.modalOverlay}
+            onPress={() => setShowManageModal(false)}
           />
           <View style={[styles.optionsMenu, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.optionsHeader}>
@@ -1169,8 +1196,8 @@ export default function StoryDetailScreen() {
             </View>
 
             {progress && (
-              <TouchableOpacity 
-                style={styles.optionItem} 
+              <TouchableOpacity
+                style={styles.optionItem}
                 onPress={() => { setShowManageModal(false); handleRemoveFromLibrary(); }}>
                 <IconSymbol name="minus.circle.fill" size={20} color={colors.error} />
                 <Text style={[styles.optionText, { color: colors.error }]}>Remove from Library</Text>
@@ -1180,17 +1207,17 @@ export default function StoryDetailScreen() {
             {user?.role === 'admin' && !isMangaDex && (
               <>
                 <View style={[styles.optionDivider, { backgroundColor: colors.border }]} />
-                <TouchableOpacity 
-                  style={styles.optionItem} 
-                  onPress={() => { 
-                    setShowManageModal(false); 
-                    router.push(`/story/add?id=${story._id}` as any); 
+                <TouchableOpacity
+                  style={styles.optionItem}
+                  onPress={() => {
+                    setShowManageModal(false);
+                    router.push(`/story/add?id=${story._id}` as any);
                   }}>
                   <IconSymbol name="pencil" size={20} color={colors.primary} />
                   <Text style={[styles.optionText, { color: colors.text }]}>Edit Story Data</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.optionItem} 
+                <TouchableOpacity
+                  style={styles.optionItem}
                   onPress={handleDeleteStory}>
                   <IconSymbol name="list.bullet.rectangle.portrait" size={20} color={colors.error} />
                   <Text style={[styles.optionText, { color: colors.error }]}>Delete (Permanent)</Text>
@@ -1198,8 +1225,8 @@ export default function StoryDetailScreen() {
               </>
             )}
 
-            <TouchableOpacity 
-              style={[styles.optionCancel, { backgroundColor: colors.surfaceElevated }]} 
+            <TouchableOpacity
+              style={[styles.optionCancel, { backgroundColor: colors.surfaceElevated }]}
               onPress={() => setShowManageModal(false)}>
               <Text style={[styles.optionCancelText, { color: colors.textSecondary }]}>Close</Text>
             </TouchableOpacity>
@@ -1222,9 +1249,9 @@ export default function StoryDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingBottom: 60 },
-  headerRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingRight: Spacing.lg,
   },
@@ -1416,9 +1443,9 @@ const styles = StyleSheet.create({
     ...Shadows.md,
   },
   addToLibraryText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
-  progressCard: { 
-    padding: Spacing.lg, 
-    borderRadius: BorderRadius.xl, 
+  progressCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
     borderWidth: 1.5,
     ...Shadows.md,
   },
@@ -1553,37 +1580,37 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
-  
+
   progressRow: { marginBottom: Spacing.xl },
   writeReview: { fontSize: 15, fontWeight: '800' },
-  reviewForm: { 
-    padding: Spacing.lg, 
-    borderRadius: BorderRadius.xl, 
-    borderWidth: 1.5, 
+  reviewForm: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1.5,
     marginBottom: Spacing.xl,
     ...Shadows.md
   },
   starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: Spacing.lg },
-  reviewInput: { 
-    padding: Spacing.md, 
-    borderRadius: BorderRadius.lg, 
-    borderWidth: 1.5, 
-    minHeight: 120, 
+  reviewInput: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    minHeight: 120,
     fontSize: 15,
     fontWeight: '500'
   },
-  submitReviewBtn: { 
-    marginTop: Spacing.lg, 
-    padding: 16, 
-    borderRadius: BorderRadius.lg, 
+  submitReviewBtn: {
+    marginTop: Spacing.lg,
+    padding: 16,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     ...Shadows.glow
   },
   submitReviewText: { color: '#FFF', fontSize: 16, fontWeight: '900' },
-  
-  emptyBox: { 
-    padding: 30, 
-    borderRadius: BorderRadius.xl, 
+
+  emptyBox: {
+    padding: 30,
+    borderRadius: BorderRadius.xl,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -1684,12 +1711,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     opacity: 0.4,
   },
-  formSubtitle: { 
-    fontSize: 13, 
-    textAlign: 'center', 
-    marginBottom: 16, 
-    opacity: 0.6, 
-    fontWeight: '600' 
+  formSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 16,
+    opacity: 0.6,
+    fontWeight: '600'
   },
   closeReviewForm: {
     position: 'absolute',
@@ -1776,5 +1803,19 @@ const styles = StyleSheet.create({
   diffIndicator: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  readBtnVIP: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: BorderRadius.lg,
+    gap: 8,
+    ...Shadows.glow,
+  },
+  readBtnVIPText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '900',
   },
 });

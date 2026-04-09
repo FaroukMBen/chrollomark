@@ -89,6 +89,7 @@ const MAPPING = {
   // Status & Flow
   'pause.circle.fill': 'pause-circle-filled',
   'play.circle.fill': 'play-circle-filled',
+  'play.fill': 'play-arrow',
   'stop.circle.fill': 'stop-circle',
 
   // Alerts
