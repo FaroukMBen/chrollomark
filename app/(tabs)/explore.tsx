@@ -490,12 +490,20 @@ export default function ExploreScreen() {
       <View style={styles.fixedHeader}>
         <View style={styles.header}>
           <Text style={[styles.pageTitle, { color: colors.text }]}>Explore</Text>
-          <TouchableOpacity
-            style={[styles.addStoryBtn, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/story/add')}>
-            <IconSymbol name="plus" size={16} color="#FFF" />
-            <Text style={styles.addStoryText}>Add</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              style={[styles.addStoryBtn, { backgroundColor: colors.surfaceElevated }]}
+              onPress={() => router.push('/navigator')}>
+              <IconSymbol name="globe" size={16} color={colors.primary} />
+              <Text style={[styles.addStoryText, { color: colors.text }]}>Browser</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addStoryBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/story/add')}>
+              <IconSymbol name="plus" size={16} color="#FFF" />
+              <Text style={styles.addStoryText}>Add</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Source Toggle */}

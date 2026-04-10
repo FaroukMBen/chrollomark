@@ -17,6 +17,7 @@ const anilistRoutes = require('./routes/anilist');
 const supportRoutes = require('./routes/support');
 const devlogRoutes = require('./routes/devlog');
 const imageRoutes = require('./routes/images');
+const bookmarkRoutes = require('./routes/bookmarks');
 
 const http = require('http');
 const socketManager = require('./socket');
@@ -26,6 +27,9 @@ const server = http.createServer(app);
 
 // Initialize Socket.io
 socketManager.init(server);
+
+// Trust Proxy for production (correct protocol detection)
+app.set('trust proxy', true);
 
 // Middleware
 app.use(cors());
@@ -47,6 +51,7 @@ app.use('/api/anilist', anilistRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/devlog', devlogRoutes);
 app.use('/api/images', imageRoutes);
+app.use('/api/bookmarks', bookmarkRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
