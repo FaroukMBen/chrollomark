@@ -229,7 +229,16 @@ class ApiService {
         return this.request<any>('/stories', { method: 'POST', body: data });
     }
 
-    async getStories(params?: { page?: string; limit?: string; search?: string; type?: string; genre?: string; sort?: string }) {
+    async getStories(params?: { 
+        page?: string; 
+        limit?: string; 
+        search?: string; 
+        type?: string; 
+        genre?: string; 
+        sort?: string; 
+        mangadexId?: string; 
+        anilistId?: string;
+    }) {
         return this.request<{ stories: any[]; totalPages: number; currentPage: number; total: number }>(
             '/stories',
             { params }
@@ -409,6 +418,23 @@ class ApiService {
 
     async getFeed() {
         return this.request<{ feed: any[]; recommendations: any[] }>('/social/feed');
+    }
+
+    async getBookmarks() {
+        return this.request<any[]>('/bookmarks');
+    }
+
+    async addBookmark(data: { title: string; url: string; icon?: string }) {
+        return this.request<any>('/bookmarks', { method: 'POST', body: data });
+    }
+
+    async deleteBookmark(id: string) {
+        return this.request<any>(`/bookmarks/${id}`, { method: 'DELETE' });
+    }
+
+    async findStoryByExternalId(params: { mangadexId?: string; anilistId?: string }) {
+        const data = await this.getStories(params as any);
+        return data.stories[0] || null;
     }
 
     async getUserStats() {

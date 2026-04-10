@@ -4,6 +4,7 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { uploadToGridFS, deleteFromGridFS } = require('../utils/imageHandler');
+const { emitToFriends } = require('../socket');
 
 const router = express.Router();
 
@@ -99,7 +100,7 @@ router.get('/me', auth, async (req, res) => {
 // @desc    Update user profile
 router.put('/profile', [auth, upload.single('avatar')], async (req, res) => {
     try {
-        const { username, bio, favoriteGenres } = req.body;
+        const { username, bio, favoriteGenres, blockedDomains } = req.body;
         const updates = {};
 
         let avatarUrl = req.body.avatar;
@@ -123,6 +124,7 @@ router.put('/profile', [auth, upload.single('avatar')], async (req, res) => {
         if (bio !== undefined) updates.bio = bio;
         if (avatarUrl !== undefined) updates.avatar = avatarUrl;
         if (favoriteGenres) updates.favoriteGenres = favoriteGenres;
+        if (blockedDomains) updates.blockedDomains = blockedDomains;
 
         const user = await User.findByIdAndUpdate(req.user._id, updates, {
             new: true,

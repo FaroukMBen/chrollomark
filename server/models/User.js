@@ -53,6 +53,7 @@ const userSchema = new mongoose.Schema(
             enum: ['user', 'admin', 'VIPcr'],
             default: 'user',
         },
+        blockedDomains: [String],
     },
     {
         timestamps: true,

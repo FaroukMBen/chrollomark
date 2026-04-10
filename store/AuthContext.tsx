@@ -10,6 +10,7 @@ interface User {
   bio: string;
   friends: string[];
   favoriteGenres: string[];
+  blockedDomains: string[];
   role: 'user' | 'admin' | 'VIPcr';
 }
 
@@ -21,6 +22,7 @@ interface AuthContextType {
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => void;
+  setUser: (user: User | null) => void;
   refreshUser: () => Promise<void>;
 }
 
@@ -32,6 +34,7 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => {},
   logout: async () => {},
   updateUser: () => {},
+  setUser: () => {},
   refreshUser: async () => {},
 });
 
@@ -100,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         updateUser,
+        setUser,
         refreshUser,
       }}>
       {children}

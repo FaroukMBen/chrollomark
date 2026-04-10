@@ -82,6 +82,8 @@ router.get('/', auth, async (req, res) => {
             ];
         }
         if (type) query.type = type;
+        if (req.query.mangadexId) query.mangadexId = req.query.mangadexId;
+        if (req.query.anilistId) query.anilistId = req.query.anilistId;
         if (genre) {
             const genreArray = genre.split(',');
             query.genres = { $all: genreArray };
