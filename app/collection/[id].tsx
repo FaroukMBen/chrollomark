@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -52,7 +53,11 @@ export default function CollectionDetailScreen() {
     }
   }, [id]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const loadLibrary = async () => {
     setIsLibraryLoading(true);

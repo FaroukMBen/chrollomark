@@ -1,6 +1,7 @@
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -83,7 +84,11 @@ export default function ProfileScreen() {
     }
   }, [isAuthenticated]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

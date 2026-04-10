@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -66,7 +67,11 @@ export default function LibraryScreen() {
     }
   }, [isAuthenticated, activeSection, statusFilter]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

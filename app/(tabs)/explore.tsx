@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -250,12 +251,18 @@ export default function ExploreScreen() {
     }
   }, [contentRating, alType, selectedGenres]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthenticated) return;
+      loadUserLibrary();
+    }, [isAuthenticated, loadUserLibrary])
+  );
+
   useEffect(() => {
     if (!isAuthenticated) return;
-    loadUserLibrary();
     // Fetch MangaDex tags for mapping
     api.getMangaDexTags().then(res => setMdTags(res.tags || []));
-  }, [isAuthenticated, loadUserLibrary]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
