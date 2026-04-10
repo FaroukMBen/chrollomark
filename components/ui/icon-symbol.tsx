@@ -143,8 +143,12 @@ const MAPPING = {
   'arrow.clockwise': 'refresh',
   'arrow.down.circle': 'file-download',
   'shield.fill': 'security',
+  'shield': 'security',
   'desktopcomputer': 'computer',
   'ellipsis.circle': 'more-vert',
+  'checkmark.shield.fill': 'verified-user',
+  'exclamationmark.shield.fill': 'security',
+  'plus.circle': 'add-circle-outline',
 } as unknown as IconMapping;
 
 /**
