@@ -11,8 +11,10 @@ import { ThemeProvider } from '@/store/ThemeContext';
 import { ToastProvider, useToast } from '@/store/ToastContext';
 
 import { useEffect, useMemo } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useAuth } from '@/store/AuthContext';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 
 const ChrolloDark = {
 
@@ -114,10 +116,39 @@ function GlobalSocketListener() {
 }
 
 function RootLayoutInner() {
+  const { isLoading: isAuthLoading } = useAuth();
   const colorScheme = useColorScheme();
   
   const theme = useMemo(() => colorScheme === 'dark' ? ChrolloDark : ChrolloLight, [colorScheme]);
   const bgColor = theme.colors.background;
+
+  if (isAuthLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ alignItems: 'center', gap: 20 }}>
+          <View style={{ 
+            width: 100, 
+            height: 100, 
+            borderRadius: 30, 
+            backgroundColor: theme.colors.primary + '15',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <IconSymbol name="book.fill" size={48} color={theme.colors.primary} />
+          </View>
+          <View style={{ alignItems: 'center', gap: 8 }}>
+            <Text style={{ 
+              fontSize: 24, 
+              fontWeight: '800', 
+              color: theme.colors.text,
+              letterSpacing: -0.5 
+            }}>ChrolloMark</Text>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
