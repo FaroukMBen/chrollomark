@@ -424,7 +424,7 @@ export default function ExploreScreen() {
           activeOpacity={0.7}
           onPress={() => router.push(`/story/${storyId}?source=${source}` as any)}>
           {coverUrl ? (
-            <Image source={{ uri: coverUrl }} style={styles.gridCover} contentFit="cover" />
+            <Image source={{ uri: api.resolveImageUrl(coverUrl) }} style={styles.gridCover} contentFit="cover" />
           ) : (
             <View style={[styles.gridCover, styles.placeholder, { backgroundColor: colors.surfaceElevated }]}>
               <IconSymbol name="book.fill" size={32} color={colors.textSecondary} />

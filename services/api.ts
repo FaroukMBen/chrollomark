@@ -33,6 +33,22 @@ class ApiService {
         this.baseUrl = `${BASE_URL}/api`;
     }
 
+    resolveImageUrl(path: string | null | undefined): string {
+        if (!path) return '';
+        
+        // Handle local GridFS paths
+        if (path.startsWith('/api/images/')) {
+            return `${BASE_URL}${path}`;
+        }
+        
+        // Use direct external links by default to save server IP
+        if (path.startsWith('http')) {
+            return path;
+        }
+        
+        return path;
+    }
+
     async setToken(token: string | null) {
         this.token = token;
         if (token) {

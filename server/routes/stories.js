@@ -5,7 +5,7 @@ const Review = require('../models/Review');
 const Recommendation = require('../models/Recommendation');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
-const { uploadToGridFS, deleteFromGridFS } = require('../utils/imageHandler');
+const { uploadToGridFS, deleteFromGridFS, saveExternalImage } = require('../utils/imageHandler');
 
 const router = express.Router();
 
@@ -18,7 +18,13 @@ router.post('/', [auth, upload.single('coverImage')], async (req, res) => {
         let coverImageUrl = req.body.coverImage; // Allow string URL fallback
         if (req.file) {
             const imageId = await uploadToGridFS(req.file.buffer, req.file);
-            coverImageUrl = `${req.protocol}://${req.get('host')}/api/images/${imageId}`;
+            coverImageUrl = `/api/images/${imageId}`;
+        } else if (coverImageUrl && coverImageUrl.startsWith('http')) {
+            // Save external image locally
+            const imageId = await saveExternalImage(coverImageUrl);
+            if (imageId) {
+                coverImageUrl = `/api/images/${imageId}`;
+            }
         }
 
         const story = new Story({
@@ -197,7 +203,18 @@ router.put('/:id', [auth, upload.single('coverImage')], async (req, res) => {
             }
 
             const imageId = await uploadToGridFS(req.file.buffer, req.file);
-            coverImageUrl = `${req.protocol}://${req.get('host')}/api/images/${imageId}`;
+            coverImageUrl = `/api/images/${imageId}`;
+        } else if (coverImageUrl && coverImageUrl.startsWith('http') && coverImageUrl !== story.coverImage) {
+            // New external image URL - download it locally
+            const imageId = await saveExternalImage(coverImageUrl);
+            if (imageId) {
+                // Delete old local cover if it exists
+                if (story.coverImage && story.coverImage.includes('/api/images/')) {
+                    const oldId = story.coverImage.split('/').pop();
+                    await deleteFromGridFS(oldId);
+                }
+                coverImageUrl = `/api/images/${imageId}`;
+            }
         }
 
         if (title) story.title = title;
@@ -327,9 +344,13 @@ router.post('/clone-mangadex', auth, async (req, res) => {
                 story.status = mappedStatus;
                 updated = true;
             }
-            if (coverImage && coverImage !== story.coverImage) {
-                story.coverImage = coverImage;
-                updated = true;
+            if (coverImage && coverImage !== story.coverImage && !story.coverImage.startsWith('/api/images/')) {
+                // Save external image locally
+                const imageId = await saveExternalImage(coverImage);
+                if (imageId) {
+                    story.coverImage = `/api/images/${imageId}`;
+                    updated = true;
+                }
             }
             if (description && description !== story.description) {
                 story.description = description;
@@ -340,10 +361,19 @@ router.post('/clone-mangadex', auth, async (req, res) => {
             return res.json({ story, created: false, updated });
         }
 
+        // Save external image locally for new story
+        let localCover = coverImage;
+        if (coverImage && coverImage.startsWith('http')) {
+            const imageId = await saveExternalImage(coverImage);
+            if (imageId) {
+                localCover = `/api/images/${imageId}`;
+            }
+        }
+
         // Create new
         story = new Story({
             title,
-            coverImage: coverImage || '',
+            coverImage: localCover || '',
             description: description || '',
             type: 'Manga',
             genres: genres || [],
@@ -388,9 +418,13 @@ router.post('/clone-anilist', auth, async (req, res) => {
                 story.status = status;
                 updated = true;
             }
-            if (coverImage && coverImage !== story.coverImage) {
-                story.coverImage = coverImage;
-                updated = true;
+            if (coverImage && coverImage !== story.coverImage && !story.coverImage.startsWith('/api/images/')) {
+                // Save external image locally
+                const imageId = await saveExternalImage(coverImage);
+                if (imageId) {
+                    story.coverImage = `/api/images/${imageId}`;
+                    updated = true;
+                }
             }
             if (author && author !== 'Unknown Author' && story.author === 'Unknown Author') {
                 story.author = author;
@@ -403,10 +437,19 @@ router.post('/clone-anilist', auth, async (req, res) => {
             return res.json({ story, created: false, updated });
         }
 
+        // Save external image locally for new story
+        let localCover = coverImage;
+        if (coverImage && coverImage.startsWith('http')) {
+            const imageId = await saveExternalImage(coverImage);
+            if (imageId) {
+                localCover = `/api/images/${imageId}`;
+            }
+        }
+
         // Create new
         story = new Story({
             title,
-            coverImage: coverImage || '',
+            coverImage: localCover || '',
             description: description || '',
             type: type || 'Manga',
             genres: genres || [],
