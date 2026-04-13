@@ -116,7 +116,6 @@ export default function ExploreScreen() {
   const [syncPhase, setSyncPhase] = useState<number>(0); // 0 = Idle, 1 = Processing
   const [syncProgress, setSyncProgress] = useState(0);
   const [privacyTarget, setPrivacyTarget] = useState<any>(null);
-  const [isPrivateSync, setIsPrivateSync] = useState(false);
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0;
@@ -1056,22 +1055,7 @@ export default function ExploreScreen() {
                     </Text>
                   </View>
 
-                  {/* Sync Privacy Toggle */}
-                  <TouchableOpacity
-                    onPress={() => setIsPrivateSync(!isPrivateSync)}
-                    activeOpacity={0.8}
-                    style={[styles.syncPrivacyRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-                    <View style={[styles.privacySmallIcon, { backgroundColor: (isPrivateSync ? colors.accent : colors.primary) + '15' }]}>
-                      <IconSymbol name={isPrivateSync ? "lock.fill" : "person.2.fill"} size={14} color={isPrivateSync ? colors.accent : colors.primary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.syncPrivacyTitle, { color: colors.text }]}>Sync as Private</Text>
-                      <Text style={[styles.syncPrivacySub, { color: colors.textSecondary }]}>Hide this and its updates from friends.</Text>
-                    </View>
-                    <View style={[styles.smallSwitch, { backgroundColor: isPrivateSync ? colors.accent : colors.border }]}>
-                      <View style={[styles.smallThumb, { transform: [{ translateX: isPrivateSync ? 14 : 2 }] }]} />
-                    </View>
-                  </TouchableOpacity>
+
                 </ScrollView>
 
                 {hasChanges ? (
@@ -1093,10 +1077,8 @@ export default function ExploreScreen() {
                             setSyncTarget(null);
                             setSyncPhase(0);
                             setSyncProgress(0);
-                            setIsPrivateSync(false);
                             const keepCover = selectedCover === 'local' ? '&keepCover=true' : '';
-                            const privateFlag = isPrivateSync ? '&isPrivate=true' : '';
-                            router.push(`/story/${t.local._id}?source=local&syncWith=${t.external.id}&syncSrc=${t.source}${keepCover}${privateFlag}` as any);
+                            router.push(`/story/${t.local._id}?source=local&syncWith=${t.external.id}&syncSrc=${t.source}${keepCover}` as any);
                           }, 400);
                         } else {
                           setSyncProgress(p);
@@ -1108,7 +1090,7 @@ export default function ExploreScreen() {
                 ) : (
                   <TouchableOpacity
                     style={[styles.confirmSyncBtn, { backgroundColor: colors.surfaceElevated, marginTop: 20 }]}
-                    onPress={() => { setSyncTarget(null); setIsPrivateSync(false); }}>
+                    onPress={() => { setSyncTarget(null); }}>
                     <Text style={[styles.confirmSyncText, { color: colors.textSecondary }]}>Close</Text>
                   </TouchableOpacity>
                 )}
@@ -1116,7 +1098,7 @@ export default function ExploreScreen() {
                 {hasChanges && (
                   <TouchableOpacity
                     style={styles.cancelSyncBtn}
-                    onPress={() => { setSyncTarget(null); setIsPrivateSync(false); }}>
+                    onPress={() => { setSyncTarget(null); }}>
                     <Text style={[styles.cancelSyncText, { color: colors.textSecondary }]}>Cancel</Text>
                   </TouchableOpacity>
                 )}
@@ -1455,37 +1437,7 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', paddingTop: 60, paddingHorizontal: Spacing.lg },
   emptyText: { fontSize: 14, textAlign: 'center' },
 
-  // Privacy Styles (Explore specific)
-  syncPrivacyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginTop: 16,
-    gap: 12,
-  },
-  privacySmallIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  syncPrivacyTitle: { fontSize: 13, fontWeight: '800' },
-  syncPrivacySub: { fontSize: 10, fontWeight: '600', marginTop: 1 },
-  smallSwitch: {
-    width: 34,
-    height: 20,
-    borderRadius: 12,
-    justifyContent: 'center',
-  },
-  smallThumb: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#FFF',
-  },
+
 
   // Modal Styles (Explore specific)
   privacyModal: {
