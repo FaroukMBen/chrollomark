@@ -2,7 +2,7 @@
   "expo": {
     "name": "chrollomark",
     "slug": "chrollomark",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-v2.png",
     "scheme": "chrollomark",
@@ -20,6 +20,10 @@
       "package": "com.faroukmben.chrollomark",
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
+        "REQUEST_INSTALL_PACKAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
         "REQUEST_INSTALL_PACKAGES",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
@@ -55,6 +59,12 @@
       "eas": {
         "projectId": "525372f4-0bbc-4f73-9693-6e5f468d1584"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/525372f4-0bbc-4f73-9693-6e5f468d1584"
     }
   }
 }

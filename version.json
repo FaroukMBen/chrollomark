@@ -1,12 +1,11 @@
 {
-    "version": "2.0.0",
+    "version": "3.0.0",
     "changelog": [
-        "BUILD V2.0.0: THE SOCIAL DISCOVERY UPDATE",
-        "Total Home Overhaul: New Hero section and premium glass stats grid",
-        "Popularity Engine: Dynamic trending feeds driven by community engagement",
-        "Real-Time Social: Instant feed and progress sync via Socket.io",
-        "Global Search: Unified search for stories, collections, and users",
-        "UI/UX Polish: Fixed Android overlaps and improved navigation ergonomics"
+        "BUILD V3.0.0: THE MULTIMEDIA EXPANSION",
+        "Anime support: tracking for episodes and seasons",
+        "Browser integration: in-app viewing and reading capability",
+        "Layout updates: redesign for collections and user profiles",
+        "Image resolver: unified localized asset rendering"
     ],
     "downloadUrl": "https://github.com/FaroukMBen/chrollomark/releases/latest",
     "mandatory": true
