@@ -1,8 +1,8 @@
 {
-    "version": "3.0.1",
+    "version": "3.0.2",
     "changelog": [
-        "BUILD V3.0.1: CRITICAL UPDATE SYSTEM FIX",
-        "Filesystem Fix: Restored APK download functionality",
+        "BUILD V3.0.2: FINAL UPDATE SYSTEM STABILIZATION",
+        "Modern API Fix: Resolved APK downloader for SDK 54",
         "Anime support: tracking for episodes and seasons",
         "Browser integration: in-app viewing and reading capability",
         "Layout updates: redesign for collections and user profiles"

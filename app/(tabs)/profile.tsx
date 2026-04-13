@@ -18,7 +18,7 @@ import {
   Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, Paths } from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 
@@ -31,7 +31,7 @@ import { useTheme } from '@/store/ThemeContext';
 import { useToast } from '@/store/ToastContext';
 
 // ─── App Update System (OTA via expo-updates + changelog from version.json) ───
-const APP_VERSION = '3.0.1';
+const APP_VERSION = '3.0.2';
 const CHANGELOG_URL = 'https://raw.githubusercontent.com/FaroukMBen/chrollomark/main/version.json';
 
 interface UpdateInfo {
@@ -107,18 +107,18 @@ export default function ProfileScreen() {
         try {
           const update = await Updates.checkForUpdateAsync();
           if (update.isAvailable) {
-            const r = await fetch(CHANGELOG_URL, { 
-              cache: 'no-cache', 
+            const r = await fetch(CHANGELOG_URL, {
+              cache: 'no-cache',
               signal: controller.signal,
-              headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' } 
+              headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
             });
             const d = await r.json();
-            setUpdateInfo({ 
-              version: d.version || 'New', 
-              changelog: d.changelog || [], 
-              downloadUrl: d.downloadUrl || '', 
-              mandatory: d.mandatory || false, 
-              isOTA: true 
+            setUpdateInfo({
+              version: d.version || 'New',
+              changelog: d.changelog || [],
+              downloadUrl: d.downloadUrl || '',
+              mandatory: d.mandatory || false,
+              isOTA: true
             });
             if (d.mandatory) applyOTAUpdate();
             clearTimeout(timeoutId);
@@ -131,13 +131,13 @@ export default function ProfileScreen() {
       }
 
       // Fallback
-      const response = await fetch(CHANGELOG_URL, { 
+      const response = await fetch(CHANGELOG_URL, {
         cache: 'no-cache',
         signal: controller.signal,
         headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
       });
       if (!response.ok) throw new Error(`Server returned ${response.status}`);
-      
+
       const data: UpdateInfo = await response.json();
       if (data.version && data.version !== APP_VERSION) {
         setUpdateInfo({ ...data, isOTA: false });
@@ -147,9 +147,9 @@ export default function ProfileScreen() {
       }
     } catch (err: any) {
       const msg = err.name === 'AbortError' ? 'Request timed out' : err.message;
-      showToast({ 
-        message: __DEV__ ? 'Dev Skip: ' + msg : 'Update error: ' + msg, 
-        type: 'error' 
+      showToast({
+        message: __DEV__ ? 'Dev Skip: ' + msg : 'Update error: ' + msg,
+        type: 'error'
       });
     } finally {
       clearTimeout(timeoutId);
@@ -162,9 +162,9 @@ export default function ProfileScreen() {
     try {
       // First, fetch the actual bundle
       await Updates.fetchUpdateAsync();
-      
+
       showToast({ message: 'Update downloaded! Restarting...', type: 'success' });
-      
+
       // Give the user a 2-second buffer to see the success state
       setTimeout(async () => {
         await Updates.reloadAsync();
@@ -186,29 +186,19 @@ export default function ProfileScreen() {
 
     try {
       const filename = `chrollomark-update-${Date.now()}.apk`;
-      const fileUri = `${(FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory}${filename}`;
+      const destination = new File(Paths.cache, filename);
 
-      const downloadResumable = FileSystem.createDownloadResumable(
-        url,
-        fileUri,
-        {},
-        (dp) => {
-          const progress = dp.totalBytesWritten / dp.totalBytesExpectedToWrite;
-          setDownloadProgress(progress);
-        }
-      );
+      const result = await File.downloadFileAsync(url, destination);
 
-      const result = await downloadResumable.downloadAsync();
-      
       if (result && result.uri) {
         setDownloadProgress(1);
-        
+
         // Use IntentLauncher to open the APK
-        const cUri = await FileSystem.getContentUriAsync(result.uri);
-        
+        const contentUri = destination.contentUri;
+
         try {
           await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
-            data: cUri,
+            data: contentUri,
             flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
             type: 'application/vnd.android.package-archive',
           });
@@ -248,14 +238,14 @@ export default function ProfileScreen() {
                 version = d.version || 'New';
                 mandatory = d.mandatory || false;
               } catch { /* */ }
-              
+
               setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
 
               // If mandatory, update itself (download and prompt)
               if (mandatory) {
                 await Updates.fetchUpdateAsync();
                 Alert.alert(
-                  "Mandatory Update", 
+                  "Mandatory Update",
                   "A critical update (v" + version + ") has been downloaded and is required to continue.",
                   [{ text: "Restart Now", onPress: () => Updates.reloadAsync() }]
                 );
@@ -263,7 +253,7 @@ export default function ProfileScreen() {
               return;
             }
           } catch (e) {
-             console.log('Silent update check failed:', e);
+            console.log('Silent update check failed:', e);
           }
         }
         const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
@@ -406,11 +396,11 @@ export default function ProfileScreen() {
 
             {!isEditing && (
               <View style={styles.headerRightActions}>
-                 <TouchableOpacity 
-                   style={[styles.iconBtn, { backgroundColor: colors.surfaceElevated }]} 
-                   onPress={() => setIsEditing(true)}>
-                   <IconSymbol name="pencil" size={16} color={colors.text} />
-                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.iconBtn, { backgroundColor: colors.surfaceElevated }]}
+                  onPress={() => setIsEditing(true)}>
+                  <IconSymbol name="pencil" size={16} color={colors.text} />
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -437,8 +427,8 @@ export default function ProfileScreen() {
           ) : (
             <>
               {user?.bio ? <Text style={[styles.bio, { color: colors.textSecondary }]}>{user.bio}</Text> : null}
-              <TouchableOpacity 
-                style={[styles.viewPublicBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]} 
+              <TouchableOpacity
+                style={[styles.viewPublicBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}
                 onPress={() => user?._id && router.push(`/user/${user._id}` as any)}>
                 <IconSymbol name="eye.fill" size={14} color={colors.primary} />
                 <Text style={[styles.viewPublicText, { color: colors.primary }]}>View Public Profile</Text>
@@ -486,8 +476,8 @@ export default function ProfileScreen() {
 
         {/* ─── UPDATE AVAILABLE ─── */}
         {updateInfo && (
-          <View style={[styles.updateCard, { 
-            backgroundColor: updateInfo.mandatory ? colors.error + '10' : '#FF674015', 
+          <View style={[styles.updateCard, {
+            backgroundColor: updateInfo.mandatory ? colors.error + '10' : '#FF674015',
             borderColor: updateInfo.mandatory ? colors.error : '#FF6740',
             borderWidth: updateInfo.mandatory ? 2 : 1
           }]}>
@@ -514,7 +504,7 @@ export default function ProfileScreen() {
             )}
             <TouchableOpacity
               style={[
-                styles.updateBtn, 
+                styles.updateBtn,
                 { backgroundColor: updateInfo.mandatory ? colors.error : colors.primary, opacity: applyingUpdate ? 0.6 : 1 }
               ]}
               disabled={applyingUpdate}
@@ -527,9 +517,9 @@ export default function ProfileScreen() {
               }}>
               <IconSymbol name={applyingUpdate ? "arrow.2.circlepath" : (updateInfo.isOTA ? "sparkles" : "arrow.down.doc.fill")} size={14} color="#FFF" />
               <Text style={styles.updateBtnText}>
-                {applyingUpdate ? (downloadProgress > 0 ? `Downloading ${Math.round(downloadProgress * 100)}%` : 'Implementing Changes...') : 
-                 updateInfo.isOTA ? 'Agree & Update Now' : 
-                 'Install Latest APK'}
+                {applyingUpdate ? (downloadProgress > 0 ? `Downloading ${Math.round(downloadProgress * 100)}%` : 'Implementing Changes...') :
+                  updateInfo.isOTA ? 'Agree & Update Now' :
+                    'Install Latest APK'}
               </Text>
             </TouchableOpacity>
             {applyingUpdate && downloadProgress > 0 && (
@@ -562,7 +552,7 @@ export default function ProfileScreen() {
             <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
-        
+
         {/* ─── ADMIN PANEL ─── */}
         {user?.role === 'admin' && (
           <View style={styles.section}>
@@ -676,16 +666,16 @@ export default function ProfileScreen() {
             <IconSymbol name="chevron.right" size={14} color={colors.error} />
           </TouchableOpacity>
         </View>
-      <ConfirmModal
-        visible={isLogoutConfirmVisible}
-        title="Logout"
-        message="Are you sure you want to logout?"
-        onConfirm={() => {
-          setIsLogoutConfirmVisible(false);
-          logout();
-        }}
-        onCancel={() => setIsLogoutConfirmVisible(false)}
-      />
+        <ConfirmModal
+          visible={isLogoutConfirmVisible}
+          title="Logout"
+          message="Are you sure you want to logout?"
+          onConfirm={() => {
+            setIsLogoutConfirmVisible(false);
+            logout();
+          }}
+          onCancel={() => setIsLogoutConfirmVisible(false)}
+        />
       </ScrollView>
     </SafeAreaView>
   );
