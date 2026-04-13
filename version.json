@@ -1,11 +1,11 @@
 {
-    "version": "3.0.0",
+    "version": "3.0.1",
     "changelog": [
-        "BUILD V3.0.0: THE MULTIMEDIA EXPANSION",
+        "BUILD V3.0.1: CRITICAL UPDATE SYSTEM FIX",
+        "Filesystem Fix: Restored APK download functionality",
         "Anime support: tracking for episodes and seasons",
         "Browser integration: in-app viewing and reading capability",
-        "Layout updates: redesign for collections and user profiles",
-        "Image resolver: unified localized asset rendering"
+        "Layout updates: redesign for collections and user profiles"
     ],
     "downloadUrl": "https://github.com/FaroukMBen/chrollomark/releases/latest",
     "mandatory": true

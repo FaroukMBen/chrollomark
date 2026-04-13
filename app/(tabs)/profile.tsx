@@ -31,7 +31,7 @@ import { useTheme } from '@/store/ThemeContext';
 import { useToast } from '@/store/ToastContext';
 
 // ─── App Update System (OTA via expo-updates + changelog from version.json) ───
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.0.1';
 const CHANGELOG_URL = 'https://raw.githubusercontent.com/FaroukMBen/chrollomark/main/version.json';
 
 interface UpdateInfo {
