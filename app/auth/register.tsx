@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppLogo } from '@/components/ui/app-logo';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -70,9 +71,7 @@ export default function RegisterScreen() {
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <View style={[styles.iconBg, { backgroundColor: colors.primary + '15' }]}>
-              <IconSymbol name="person.crop.circle.badge.plus" size={40} color={colors.primary} />
-            </View>
+            <AppLogo size={80} style={{ marginBottom: Spacing.md }} />
             <Text style={[styles.title, { color: colors.text }]}>Create Account</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Start tracking your manga & webtoon journey
@@ -216,14 +215,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: Spacing.md,
     marginBottom: Spacing.lg,
-  },
-  iconBg: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
   },
   title: {
     fontSize: 30,

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppLogo } from '@/components/ui/app-logo';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -62,9 +63,7 @@ export default function LoginScreen() {
 
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.iconBg, { backgroundColor: colors.primary + '15' }]}>
-              <IconSymbol name="book.fill" size={40} color={colors.primary} />
-            </View>
+            <AppLogo size={80} style={{ marginBottom: Spacing.md }} />
             <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Sign in to continue tracking your reading
@@ -173,14 +172,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: Spacing.lg,
     marginBottom: Spacing.xl,
-  },
-  iconBg: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
   },
   title: {
     fontSize: 30,
