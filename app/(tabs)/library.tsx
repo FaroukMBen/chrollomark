@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -33,11 +34,13 @@ export default function LibraryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeSection, setActiveSection] = useState<'Stories' | 'Collections' | 'Favorites'>('Stories');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'All' | 'Manga' | 'Anime'>('All');
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'compact'>('list');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const [librarySearchQuery, setLibrarySearchQuery] = useState('');
+  const [showPrivateOnly, setShowPrivateOnly] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -45,17 +48,18 @@ export default function LibraryScreen() {
       if (activeSection === 'Collections') {
         const collectionsData = await api.getMyCollections();
         setCollections(collectionsData);
-        setProgress([]); 
+        setProgress([]);
       } else {
         let params: any = {};
         if (activeSection === 'Favorites') params.favorite = 'true';
         if (statusFilter !== 'All') params.status = statusFilter;
-        
+        if (mediaTypeFilter !== 'All') params.type = mediaTypeFilter;
+
         const [progressData, statsData] = await Promise.all([
           api.getMyProgress(Object.keys(params).length > 0 ? params : undefined),
           api.getProgressStats()
         ]);
-        
+
         setProgress(progressData);
         setStats(statsData);
         setCollections([]);
@@ -65,7 +69,7 @@ export default function LibraryScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, activeSection, statusFilter]);
+  }, [isAuthenticated, activeSection, statusFilter, mediaTypeFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -82,31 +86,39 @@ export default function LibraryScreen() {
   const sortedProgress = React.useMemo(() => {
     if (!progress) return [];
     let items = [...progress];
-    
+
     // Filter by search query
     if (librarySearchQuery.trim()) {
       const q = librarySearchQuery.toLowerCase();
       items = items.filter(p => p.story?.title?.toLowerCase().includes(q));
     }
 
+    if (mediaTypeFilter !== 'All') {
+      items = items.filter(p => p.story?.type === mediaTypeFilter);
+    }
+
+    if (showPrivateOnly) {
+      items = items.filter(p => p.isPrivate === true);
+    }
+
     switch (sortBy) {
-      case 'az': 
+      case 'az':
         return items.sort((a, b) => (a.story?.title || '').localeCompare(b.story?.title || ''));
-      case 'za': 
+      case 'za':
         return items.sort((a, b) => (b.story?.title || '').localeCompare(a.story?.title || ''));
-      case 'newest': 
+      case 'newest':
         return items; // Default from API is usually newest
-      case 'oldest': 
+      case 'oldest':
         return items.reverse();
-      default: 
+      default:
         return items;
     }
-  }, [progress, sortBy, librarySearchQuery]);
+  }, [progress, sortBy, librarySearchQuery, mediaTypeFilter, showPrivateOnly]);
 
   const filteredCollections = React.useMemo(() => {
     if (!collections) return [];
     if (!librarySearchQuery.trim()) return collections;
-    
+
     const q = librarySearchQuery.toLowerCase();
     return collections.filter(c => c.name?.toLowerCase().includes(q));
   }, [collections, librarySearchQuery]);
@@ -119,7 +131,7 @@ export default function LibraryScreen() {
 
   const getSortIcon = () => {
     switch (sortBy) {
-      case 'az': 
+      case 'az':
       case 'za': return 'abc';
       case 'newest': return 'arrow.down';
       case 'oldest': return 'arrow.up';
@@ -185,7 +197,7 @@ export default function LibraryScreen() {
       style={[styles.fullCollCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
       onPress={() => router.push(`/collection/${coll._id}` as any)}
       activeOpacity={0.8}>
-      
+
       {/* Dynamic Theme Accent */}
       <View style={[styles.collThemeBar, { backgroundColor: coll.color || colors.primary }]} />
 
@@ -193,7 +205,7 @@ export default function LibraryScreen() {
         {coll.stories && coll.stories.length > 0 ? (
           <View style={styles.previewGrid}>
             {coll.stories.slice(0, 4).map((story: any, idx: number) => (
-              <Image 
+              <Image
                 key={story._id || idx}
                 source={{ uri: story.coverImage }}
                 style={[
@@ -223,10 +235,10 @@ export default function LibraryScreen() {
       <View style={styles.collDetails}>
         <View style={styles.collTitleRow}>
           <Text style={[styles.collName, { color: colors.text, flex: 1 }]} numberOfLines={1}>{coll.name}</Text>
-          <IconSymbol 
-            name={coll.isPublic ? "globe" : "lock.fill"} 
-            size={12} 
-            color={colors.textSecondary} 
+          <IconSymbol
+            name={coll.isPublic ? "globe" : "lock.fill"}
+            size={12}
+            color={colors.textSecondary}
           />
         </View>
         <View style={styles.collMetaRow}>
@@ -240,81 +252,165 @@ export default function LibraryScreen() {
   );
 
   const renderStoryItem = (item: any) => {
+    const itemKey = `${viewMode}-${item._id}`;
+
     if (viewMode === 'list') {
+      const sColor = StatusColors[item.status] || colors.primary;
       return (
         <TouchableOpacity
-          key={item._id}
-          style={[styles.listItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-          onPress={() => router.push(`/story/${item.story._id}` as any)}
-          activeOpacity={0.7}>
-          {item.story.coverImage ? (
-            <Image source={{ uri: item.story.coverImage }} style={styles.listCover} contentFit="cover" />
+          key={itemKey}
+          style={[styles.libListCard, { borderColor: colors.border + '20' }]}
+          onPress={() => router.push(`/story/${item.story?._id}` as any)}
+          activeOpacity={0.8}>
+
+          {/* Full-bleed cover background */}
+          {item.story?.coverImage ? (
+            <Image
+              source={{ uri: item.story.coverImage }}
+              style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+              contentFit="cover"
+              blurRadius={1}
+            />
           ) : (
-            <View style={[styles.listCover, styles.placeholderCover, { backgroundColor: colors.surfaceElevated }]}>
-              <IconSymbol name="book.fill" size={24} color={colors.textSecondary} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.surfaceElevated }]} />
+          )}
+
+          {/* Cinematic gradient — heavier on the right for text readability */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.92)']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+          />
+
+          {/* Content overlay */}
+          <View style={styles.libListOverlay}>
+            {/* Left: cover thumbnail + status accent */}
+            <View style={styles.libListLeft}>
+              {item.story?.coverImage ? (
+                <Image source={{ uri: item.story.coverImage }} style={styles.libListThumb} contentFit="cover" />
+              ) : (
+                <View style={[styles.libListThumb, { backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }]}>
+                  <IconSymbol name="book.fill" size={20} color="rgba(255,255,255,0.5)" />
+                </View>
+              )}
+              {/* Status accent bar under thumbnail */}
+              <View style={[styles.libListThumbAccent, { backgroundColor: sColor }]} />
+            </View>
+
+            {/* Right: text info */}
+            <View style={styles.libListInfo}>
+              <Text style={styles.libListTitle} numberOfLines={1}>
+                {item.story?.title}
+              </Text>
+              <Text style={styles.libListAuthor} numberOfLines={1}>
+                {item.story?.author || (item.story?.type || 'Story')}
+              </Text>
+
+              <View style={styles.libListMeta}>
+                <View style={[styles.libListStatusPill, { backgroundColor: sColor + '50' }]}>
+                  <Text style={styles.libListStatusText}>{item.status.toUpperCase()}</Text>
+                </View>
+                <Text style={styles.libListChapter}>
+                  {item.story?.type === 'Anime' ? `S${item.currentSeason || 1} E${item.currentChapter}` : `Ch. ${item.currentChapter}`}
+                  {item.story?.totalChapters ? ` / ${item.story.totalChapters}` : ''}
+                </Text>
+              </View>
+            </View>
+
+            {/* Quick increment */}
+            <TouchableOpacity
+              style={[styles.libListPlusBtn, { backgroundColor: 'rgba(255,255,255,0.12)' }]}
+              onPress={async (e) => {
+                e.stopPropagation();
+                try {
+                  const updated = await api.incrementChapter(item._id);
+                  setProgress((prev) => prev.map((p) => (p._id === item._id ? updated : p)));
+                } catch (err) { console.log(err); }
+              }}>
+              <IconSymbol name="plus" size={18} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Badges */}
+          {item.isFavorite && (
+            <View style={styles.libListFavBadge}>
+              <IconSymbol name="heart.fill" size={10} color="#EF4444" />
             </View>
           )}
-          <View style={styles.listInfo}>
-            <Text style={[styles.listTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
-            <Text style={[styles.listAuthor, { color: colors.textSecondary }]} numberOfLines={1}>{item.story.author || item.story.type}</Text>
-            <View style={styles.listMeta}>
-              <View style={[styles.statusBadge, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
-                <View style={[styles.statusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
-                <Text style={[styles.statusText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
-              </View>
-              <Text style={[styles.chapterInfo, { color: colors.primary }]}>
-                {item.story?.type === 'Anime' ? `S${item.currentSeason || 1} E${item.currentChapter}` : `Ch. ${item.currentChapter}`}
-                {item.story?.totalChapters ? ` / ${item.story.totalChapters}` : ''}
-              </Text>
+          {item.isPrivate && (
+            <View style={styles.libListLockBadge}>
+              <IconSymbol name="lock.fill" size={9} color="rgba(255,255,255,0.8)" />
             </View>
-          </View>
-          {item.isFavorite && <IconSymbol name="heart.fill" size={14} color="#EF4444" style={{ marginRight: 8 }} />}
-          <TouchableOpacity style={[styles.quickAction, { backgroundColor: colors.primary }]} onPress={async (e) => {
-            e.stopPropagation();
-            try {
-              const updated = await api.incrementChapter(item._id);
-              setProgress((prev) => prev.map((p) => (p._id === item._id ? updated : p)));
-            } catch (err) { console.log(err); }
-          }}><IconSymbol name="plus" size={16} color="#FFF" /></TouchableOpacity>
+          )}
         </TouchableOpacity>
       );
     }
-    
+
     if (viewMode === 'grid') {
       return (
         <TouchableOpacity
-          key={item._id}
-          style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-          onPress={() => router.push(`/story/${item.story._id}` as any)}
-          activeOpacity={0.7}>
-          {item.story.coverImage ? (
-            <Image source={{ uri: item.story.coverImage }} style={styles.gridCover} contentFit="cover" />
+          key={itemKey}
+          style={[styles.libGridCard, { borderColor: colors.border + '30', minHeight: 240 }]}
+          onPress={() => router.push(`/story/${item.story?._id}` as any)}
+          activeOpacity={0.8}>
+
+          {item.story?.coverImage ? (
+            <Image source={{ uri: item.story.coverImage }} style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]} contentFit="cover" />
           ) : (
-            <View style={[styles.gridCover, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
               <IconSymbol name="book.fill" size={32} color={colors.textSecondary} />
             </View>
           )}
-          {item.isFavorite && <View style={styles.favoriteBadge}><IconSymbol name="heart.fill" size={10} color="#EF4444" /></View>}
-          <View style={styles.gridInfo}>
-            <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
-            <View style={styles.gridMeta}>
-              <Text style={[styles.gridChapter, { color: colors.primary }]}>
-                {item.story?.type === 'Anime' ? `S${item.currentSeason || 1} E${item.currentChapter}` : `Ch. ${item.currentChapter}`}
+
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.95)']}
+            style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
+          />
+
+          <View style={styles.libGridOverlay}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+              <Text style={styles.libGridTitle} numberOfLines={2}>
+                {item.story?.title}
               </Text>
-              <View style={[styles.gridStatusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
+              {item.isPrivate && <IconSymbol name="lock.fill" size={10} color="rgba(255,255,255,0.6)" />}
+            </View>
+
+            <View style={styles.libGridMeta}>
+              <View style={{ flex: 1, gap: 4 }}>
+                <View style={[styles.libStatusPill, { backgroundColor: (StatusColors[item.status] || '#FFF') + '40', alignSelf: 'flex-start' }]}>
+                  <Text style={styles.libStatusText}>{item.status.toUpperCase()}</Text>
+                </View>
+                <Text style={styles.libGridChapter}>
+                  {item.story?.type === 'Anime' ? `S${item.currentSeason || 1} E${item.currentChapter}` : `CH. ${item.currentChapter}`}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.libQuickPlus, { backgroundColor: colors.primary }]}
+                onPress={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    const updated = await api.incrementChapter(item._id);
+                    setProgress((prev) => prev.map((p) => (p._id === item._id ? updated : p)));
+                  } catch (err) { console.log(err); }
+                }}>
+                <IconSymbol name="plus" size={14} color="#FFF" />
+              </TouchableOpacity>
             </View>
           </View>
+
+          {item.isFavorite && <View style={styles.favoriteBadge}><IconSymbol name="heart.fill" size={10} color="#EF4444" /></View>}
         </TouchableOpacity>
       );
     }
 
     return (
       <TouchableOpacity
-        key={item._id}
+        key={itemKey}
         style={[styles.compactCard, { borderColor: colors.cardBorder }]}
-        onPress={() => router.push(`/story/${item.story._id}` as any)}
+        onPress={() => router.push(`/story/${item.story?._id}` as any)}
         activeOpacity={0.7}>
-        {item.story.coverImage ? (
+        {item.story?.coverImage ? (
           <Image source={{ uri: item.story.coverImage }} style={styles.compactCover} contentFit="cover" />
         ) : (
           <View style={[styles.compactCover, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
@@ -322,18 +418,21 @@ export default function LibraryScreen() {
           </View>
         )}
         {item.isFavorite && <View style={styles.compactFav}><IconSymbol name="heart.fill" size={8} color="#EF4444" /></View>}
-        <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4 }}>
+          <Text style={[styles.compactTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{item.story?.title}</Text>
+          {item.isPrivate && <IconSymbol name="lock.fill" size={8} color={colors.accent} />}
+        </View>
       </TouchableOpacity>
     );
   };
 
   const renderEmptyState = (type: 'Stories' | 'Collections') => {
     const isSearch = librarySearchQuery.trim().length > 0;
-    
+
     if (type === 'Collections') {
       const collTitle = isSearch ? "No results found" : "No collections yet";
       const collSub = isSearch ? `No collection matches "${librarySearchQuery}"` : "Create collections to organize your stories";
-      
+
       return (
         <View style={styles.emptyCenter}>
           <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
@@ -373,7 +472,7 @@ export default function LibraryScreen() {
 
   const renderStoriesContent = () => {
     if (progress.length === 0) return renderEmptyState('Stories');
-    
+
     return (
       <View style={[styles.storiesScrollSection, viewMode !== 'list' && styles.gridContainer]}>
         {sortedProgress.map(renderStoryItem)}
@@ -387,23 +486,23 @@ export default function LibraryScreen() {
     return (
       <View style={[styles.pinnedToolbar, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         <View style={styles.pinnedHeaderLeft}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.filterActionButtonCompact, 
+              styles.filterActionButtonCompact,
               { backgroundColor: colors.surfaceElevated },
               isFiltersExpanded && { borderColor: colors.primary, borderWidth: 1, backgroundColor: colors.primary + '10' }
-            ]} 
+            ]}
             onPress={() => setIsFiltersExpanded(!isFiltersExpanded)}
             activeOpacity={0.6}
           >
-            <IconSymbol 
-              name="line.3.horizontal.decrease" 
-              size={14} 
-              color={isFiltersExpanded ? colors.primary : colors.text} 
+            <IconSymbol
+              name="line.3.horizontal.decrease"
+              size={14}
+              color={isFiltersExpanded ? colors.primary : colors.text}
             />
             <Text style={[styles.filterActionText, { color: isFiltersExpanded ? colors.primary : colors.text }]}>Filters</Text>
           </TouchableOpacity>
-          
+
           <View style={[styles.pinnedCountBadge, { backgroundColor: colors.primary + '10' }]}>
             <Text style={[styles.pinnedCountText, { color: colors.primary }]}>{sortedProgress.length}</Text>
           </View>
@@ -411,29 +510,29 @@ export default function LibraryScreen() {
 
         <View style={styles.toolbarActions}>
           <TouchableOpacity style={[styles.miniSortAction, { backgroundColor: colors.surfaceElevated }]} onPress={toggleSort}>
-            <IconSymbol 
-              name={getSortIcon() as any} 
-              size={14} 
-              color={colors.primary} 
-              style={sortBy === 'za' ? { transform: [{ rotate: '180deg' }] } : undefined} 
+            <IconSymbol
+              name={getSortIcon() as any}
+              size={14}
+              color={colors.primary}
+              style={sortBy === 'za' ? { transform: [{ rotate: '180deg' }] } : undefined}
             />
           </TouchableOpacity>
-          
+
           <View style={[styles.viewTogglePinned, { backgroundColor: colors.surfaceElevated }]}>
             {(['list', 'grid', 'compact'] as const).map(mode => {
               const isModeActive = viewMode === mode;
               const modeIcons = { list: 'list.bullet', grid: 'square.grid.2x2.fill', compact: 'square.grid.3x3.fill' };
-              
+
               return (
-                <TouchableOpacity 
-                  key={mode} 
-                  onPress={() => setViewMode(mode)} 
+                <TouchableOpacity
+                  key={mode}
+                  onPress={() => setViewMode(mode)}
                   style={[styles.toggleBtnPinned, isModeActive && { backgroundColor: colors.primary }]}
                 >
-                  <IconSymbol 
-                    name={modeIcons[mode] as any} 
-                    size={14} 
-                    color={isModeActive ? '#FFF' : colors.textSecondary} 
+                  <IconSymbol
+                    name={modeIcons[mode] as any}
+                    size={14}
+                    color={isModeActive ? '#FFF' : colors.textSecondary}
                   />
                 </TouchableOpacity>
               );
@@ -449,25 +548,66 @@ export default function LibraryScreen() {
 
     return (
       <View style={[styles.filterPanelFull, { backgroundColor: colors.surface + '60', borderBottomColor: colors.border }]}>
+        {/* Media Type Section */}
         <View style={styles.filterSection}>
+          <View style={styles.filterPanelHeader}>
+            <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>MEDIA TYPE</Text>
+          </View>
+          <View style={styles.sortGridContainer}>
+            {(['All', 'Manga', 'Anime'] as const).map((type) => {
+              const isActive = mediaTypeFilter === type;
+              const typeIcons = { All: 'square.grid.2x2.fill', Manga: 'book.fill', Anime: 'play.fill' };
+              const colorsList = {
+                Manga: ['#8B5CF6', '#D946EF'],
+                Anime: ['#F59E0B', '#EF4444'],
+                All: [colors.primary, '#06B6D4']
+              };
+              const currentColors = colorsList[type] || [colors.primary, colors.primary];
+
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.mediaTypeTile, { backgroundColor: colors.surfaceElevated }]}
+                  onPress={() => { setMediaTypeFilter(type); setIsLoading(true); }}
+                  activeOpacity={0.8}
+                >
+                  {isActive ? (
+                    <LinearGradient
+                      colors={currentColors as [string, string]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  ) : (
+                    <View style={[styles.inactiveGradientBorder, { borderColor: currentColors[0] + '30' }]} />
+                  )}
+                  <IconSymbol
+                    name={typeIcons[type] as any}
+                    size={18}
+                    color={isActive ? '#FFF' : currentColors[0]}
+                  />
+                  <Text style={[styles.mediaTileText, { color: isActive ? '#FFF' : colors.text }]}>{type}</Text>
+                  {isActive && <View style={styles.activeDotPointer} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Status Section */}
+        <View style={[styles.filterSection, { marginTop: Spacing.xl }]}>
           <View style={styles.filterPanelHeader}>
             <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>STORY STATUS</Text>
           </View>
-          
           <View style={styles.filterGridContainer}>
             {['All', ...ReadingStatuses].map((filter) => {
               const isActive = statusFilter === filter;
               const isDropped = filter === 'Dropped';
-              
               let filterColor = colors.primary;
-              if (isDropped) {
-                filterColor = '#EF4444';
-              } else if (filter !== 'All' && StatusColors[filter]) {
-                filterColor = StatusColors[filter];
-              }
+              if (isDropped) filterColor = '#EF4444';
+              else if (filter !== 'All' && StatusColors[filter]) filterColor = StatusColors[filter];
 
               const textColor = isActive ? filterColor : (isDropped ? '#EF444490' : colors.text);
-              const countColor = isActive ? filterColor : (isDropped ? '#EF444460' : colors.textSecondary);
               const currentCount = getStatusCount(filter);
 
               return (
@@ -491,7 +631,7 @@ export default function LibraryScreen() {
                   </View>
                   {currentCount > 0 && (
                     <View style={[styles.filterChipBadge, { backgroundColor: isActive ? filterColor + '20' : colors.background }]}>
-                      <Text style={[styles.filterChipCount, { color: countColor }]}>{currentCount}</Text>
+                      <Text style={[styles.filterChipCount, { color: isActive ? filterColor : colors.textSecondary }]}>{currentCount}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -500,6 +640,7 @@ export default function LibraryScreen() {
           </View>
         </View>
 
+        {/* Sort Section */}
         <View style={[styles.filterSection, { marginTop: Spacing.xl }]}>
           <View style={styles.filterPanelHeader}>
             <Text style={[styles.filterPanelLabel, { color: colors.textSecondary }]}>SORT ORDER</Text>
@@ -509,7 +650,7 @@ export default function LibraryScreen() {
               const isActive = sortBy === option;
               const labels = { newest: 'Newest', oldest: 'Oldest', az: 'A-Z', za: 'Z-A' };
               const icons = { newest: 'arrow.down', oldest: 'arrow.up', az: 'abc', za: 'textformat.abc' };
-              
+
               return (
                 <TouchableOpacity
                   key={option}
@@ -521,10 +662,10 @@ export default function LibraryScreen() {
                   onPress={() => setSortBy(option)}
                   activeOpacity={0.7}
                 >
-                  <IconSymbol 
-                    name={icons[option] as any} 
-                    size={14} 
-                    color={isActive ? '#FFF' : colors.textSecondary} 
+                  <IconSymbol
+                    name={icons[option] as any}
+                    size={14}
+                    color={isActive ? '#FFF' : colors.textSecondary}
                     style={option === 'za' ? { transform: [{ rotate: '180deg' }] } : undefined}
                   />
                   <Text style={[styles.sortTileText, { color: isActive ? '#FFF' : colors.text }]}>{labels[option]}</Text>
@@ -559,16 +700,33 @@ export default function LibraryScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1 }}>
             <View>
               <Text style={[styles.title, { color: colors.text }]}>My Library</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              <Text style={[styles.statsSummaryText, { color: colors.textSecondary }]}>
                 {activeSection === 'Collections' ? `${filteredCollections.length} collections` : `${sortedProgress.length} titles`}
               </Text>
             </View>
-            <TouchableOpacity 
-              style={[styles.searchToggle, { backgroundColor: colors.surfaceElevated }]} 
-              onPress={() => setIsSearchVisible(true)}
-            >
-              <IconSymbol name="magnifyingglass" size={20} color={colors.text} />
-            </TouchableOpacity>
+            <View style={styles.headerRightActions}>
+              <TouchableOpacity
+                style={[
+                  styles.smallActionBtn,
+                  { backgroundColor: showPrivateOnly ? colors.accent + '20' : colors.surfaceElevated, borderWidth: showPrivateOnly ? 1 : 0, borderColor: colors.accent }
+                ]}
+                onPress={() => { setShowPrivateOnly(!showPrivateOnly); }}
+              >
+                <IconSymbol name={showPrivateOnly ? "eye.slash.fill" : "eye.fill"} size={20} color={showPrivateOnly ? colors.accent : colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.smallActionBtn, { backgroundColor: colors.surfaceElevated }]}
+                onPress={() => router.push('/user/stats')}
+              >
+                <IconSymbol name="chart.bar.fill" size={20} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.searchToggle, { backgroundColor: colors.surfaceElevated }]}
+                onPress={() => setIsSearchVisible(true)}
+              >
+                <IconSymbol name="magnifyingglass" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </View>
@@ -608,8 +766,8 @@ export default function LibraryScreen() {
                 <View style={styles.collectionTitleRow}>
                   <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18 }]}>My Collections</Text>
                 </View>
-                <TouchableOpacity 
-                  style={[styles.newCollBtnPremium, { backgroundColor: colors.primary }]} 
+                <TouchableOpacity
+                  style={[styles.newCollBtnPremium, { backgroundColor: colors.primary }]}
                   onPress={() => router.push('/collection/create')}
                   activeOpacity={0.8}
                 >
@@ -640,7 +798,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xl },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xs },
   title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, fontWeight: '500', marginTop: 2 },
+  statsSummaryText: { fontSize: 13, fontWeight: '500', marginTop: 2 },
   addBtn: { width: 40, height: 40, borderRadius: BorderRadius.full, justifyContent: 'center', alignItems: 'center', ...Shadows.sm },
   tabContainer: { borderBottomWidth: 1, marginBottom: Spacing.xs },
   tabContent: { paddingHorizontal: Spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
@@ -648,12 +806,12 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14, fontWeight: '700' },
   filterWrapper: { paddingVertical: Spacing.sm },
   filterContent: { paddingHorizontal: Spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pinnedToolbar: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: Spacing.lg, 
-    paddingVertical: 12, 
+  pinnedToolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     zIndex: 10
   },
@@ -662,69 +820,69 @@ const styles = StyleSheet.create({
   pinnedCountText: { fontSize: 10, fontWeight: '800' },
   toolbarActions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
   miniSortAction: { width: 32, height: 32, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
-  filterActionButtonCompact: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 6, 
-    paddingHorizontal: 10, 
-    paddingVertical: 6, 
+  filterActionButtonCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: BorderRadius.md,
     ...Shadows.sm
   },
   filterActionText: { fontSize: 13, fontWeight: '700' },
   viewTogglePinned: { flexDirection: 'row', borderRadius: BorderRadius.md, padding: 2 },
   toggleBtnPinned: { width: 30, height: 30, borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
-  
-  filterPanelFull: { 
-    paddingTop: Spacing.lg, 
+
+  filterPanelFull: {
+    paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl + 10,
     borderBottomWidth: 1,
     zIndex: 5,
     width: '100%'
   },
   filterSection: { width: '100%' },
-  filterPanelHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
+  filterPanelHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.md
   },
   filterPanelLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
   filterCloseText: { fontSize: 12, fontWeight: '700' },
-  filterGridContainer: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    gap: 8, 
+  filterGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     paddingHorizontal: Spacing.lg
   },
-  filterChipPremium: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  filterChipPremium: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 10, 
+    paddingLeft: 10,
     paddingRight: 6,
-    paddingVertical: 10, 
-    borderRadius: BorderRadius.md, 
+    paddingVertical: 10,
+    borderRadius: BorderRadius.md,
     minWidth: '31%',
     flexGrow: 1,
     ...Shadows.sm
   },
-  sortTilePremium: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  sortTilePremium: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10, 
-    paddingVertical: 8, 
-    borderRadius: BorderRadius.md, 
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.md,
     flex: 1,
     justifyContent: 'center',
     ...Shadows.sm
   },
   sortTileText: { fontSize: 11, fontWeight: '800' },
-  sortGridContainer: { 
-    flexDirection: 'row', 
-    gap: 8, 
+  sortGridContainer: {
+    flexDirection: 'row',
+    gap: 8,
     paddingHorizontal: Spacing.lg
   },
   filterChipMain: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -739,12 +897,12 @@ const styles = StyleSheet.create({
   collectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   collectionTitleRow: { flexDirection: 'row', alignItems: 'center' },
   sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
-  newCollBtnPremium: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 6, 
-    paddingHorizontal: 12, 
-    paddingVertical: 8, 
+  newCollBtnPremium: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: BorderRadius.full,
     ...Shadows.md
   },
@@ -768,42 +926,79 @@ const styles = StyleSheet.create({
   collCount: { fontSize: 12, fontWeight: '600' },
   listContent: { paddingBottom: 100 },
   storiesScrollSection: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
-  listItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.sm, borderRadius: BorderRadius.lg, marginBottom: Spacing.sm, borderWidth: 1 },
-  listCover: { width: 65, height: 90, borderRadius: BorderRadius.md },
-  placeholderCover: { justifyContent: 'center', alignItems: 'center' },
-  listInfo: { flex: 1, marginLeft: Spacing.md },
-  listTitle: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
-  listAuthor: { fontSize: 12, marginBottom: 6, fontWeight: '500' },
-  listMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  chapterInfo: { fontSize: 12, fontWeight: '700' },
-  quickAction: { width: 38, height: 38, borderRadius: BorderRadius.full, justifyContent: 'center', alignItems: 'center', marginLeft: Spacing.sm, ...Shadows.sm },
+  libListCard: {
+    height: 120,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: Spacing.sm,
+    position: 'relative',
+    backgroundColor: '#000',
+    ...Shadows.md,
+  },
+  libListOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    paddingRight: 10,
+    gap: 15,
+  },
+  libListLeft: { alignItems: 'center', gap: 6 },
+  libListThumb: { width: 65, height: 90, borderRadius: BorderRadius.md, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)' },
+  libListThumbAccent: { width: 30, height: 4, borderRadius: 2 },
+  libListInfo: { flex: 1, justifyContent: 'center' },
+  libListTitle: { color: '#FFF', fontSize: 16, fontWeight: '900', letterSpacing: -0.3, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  libListAuthor: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '600', marginTop: 2 },
+  libListMeta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+  libListStatusPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4 },
+  libListStatusText: { color: '#FFF', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  libListChapter: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '800' },
+  libListPlusBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  libListFavBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255,255,255,0.9)', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  libListLockBadge: { position: 'absolute', top: 8, right: 34, backgroundColor: 'rgba(0,0,0,0.5)', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   emptyCenter: { paddingTop: 60, alignItems: 'center', paddingHorizontal: Spacing.xl },
   emptyIconBg: { width: 80, height: 80, borderRadius: BorderRadius.xl, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start' },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md, marginTop: Spacing.sm },
   viewToggle: { flexDirection: 'row', borderRadius: BorderRadius.lg, padding: 4 },
   toggleBtn: { width: 36, height: 36, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridCard: { width: '48%', borderRadius: BorderRadius.lg, borderWidth: 1, overflow: 'hidden', marginBottom: Spacing.md },
-  gridCover: { width: '100%', height: 200 },
-  gridInfo: { padding: Spacing.sm },
-  gridTitle: { fontSize: 13, fontWeight: '700', lineHeight: 18, height: 18 },
-  gridMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
-  gridChapter: { fontSize: 11, fontWeight: '800' },
-  gridStatusDot: { width: 8, height: 8, borderRadius: 4 },
-  favoriteBadge: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(255,255,255,0.9)', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  libGridCard: {
+    width: '48%',
+    height: 240,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: Spacing.md,
+    position: 'relative',
+    backgroundColor: '#000',
+    ...Shadows.md
+  },
+  libGridOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 10,
+    paddingBottom: 12,
+  },
+  libGridTitle: { color: '#FFF', fontSize: 13, fontWeight: '900', lineHeight: 16, flex: 1, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  libGridMeta: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8 },
+  libStatusPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  libStatusText: { color: '#FFF', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  libGridChapter: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' },
+  libQuickPlus: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', ...Shadows.sm },
+  favoriteBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255,255,255,0.9)', width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
   compactGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' },
   compactCard: { width: '31%', marginBottom: Spacing.md },
   compactCover: { width: '100%', height: 140, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.1)' },
   compactTitle: { fontSize: 10, fontWeight: '600', marginTop: 4, textAlign: 'center' },
   compactFav: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(255,255,255,0.9)', width: 14, height: 14, borderRadius: 7, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
-  sortBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(148, 163, 184, 0.08)',
     paddingHorizontal: 10,
@@ -811,14 +1006,27 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   sortText: { fontSize: 11, fontWeight: '700' },
-  searchBar: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    height: 46, 
-    borderRadius: BorderRadius.lg, 
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 46,
+    borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
     gap: 10,
+    ...Shadows.sm
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  smallActionBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
     ...Shadows.sm
   },
   searchInput: {
@@ -835,4 +1043,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Shadows.sm
   },
+  mediaTypeTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 18,
+    borderRadius: BorderRadius.md,
+    flex: 1,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    ...Shadows.md
+  },
+  inactiveGradientBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 1.5,
+    borderRadius: BorderRadius.md,
+    opacity: 0.5,
+  },
+  mediaTileText: { fontSize: 13, fontWeight: '900', letterSpacing: 0.5, textTransform: 'uppercase' },
+  activeDotPointer: { position: 'absolute', bottom: 6, width: 20, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' },
 });
+
+
+
