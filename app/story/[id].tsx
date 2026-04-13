@@ -44,13 +44,12 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 const isMangaDexId = (id: string) => id.includes('-');
 
 export default function StoryDetailScreen() {
-  const { id, source, syncWith, syncSrc, keepCover, isPrivate } = useLocalSearchParams<{
+  const { id, source, syncWith, syncSrc, keepCover } = useLocalSearchParams<{
     id: string;
     source?: string;
     syncWith?: string;
     syncSrc?: string;
     keepCover?: string;
-    isPrivate?: string;
   }>();
   const { user } = useAuth();
   const colorScheme = useColorScheme();
@@ -220,15 +219,7 @@ export default function StoryDetailScreen() {
           }
         }
 
-        // Handle Privacy Sync if flag present
-        if (isPrivate === 'true' && localData.userProgress) {
-          api.updateProgress({ storyId: id, isPrivate: true }).catch(err => {
-            console.error('Failed to update sync privacy:', err);
-          });
-          setProgress({ ...localData.userProgress, isPrivate: true });
-        } else {
-          setProgress(localData.userProgress || null);
-        }
+        setProgress(localData.userProgress || null);
 
         setFriendsProgress(localData.friendsProgress || []);
         setReviews(localData.reviews || []);
