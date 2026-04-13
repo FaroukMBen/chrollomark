@@ -83,10 +83,14 @@ router.get('/', auth, async (req, res) => {
         }
         if (type) query.type = type;
         if (req.query.mangadexId) query.mangadexId = req.query.mangadexId;
-        if (req.query.anilistId) query.anilistId = req.query.anilistId;
+        if (req.query.anilistId) query.anilistId = Number(req.query.anilistId);
         if (genre) {
             const genreArray = genre.split(',');
             query.genres = { $all: genreArray };
+        }
+        if (contentRating) {
+            const ratingArray = contentRating.split(',');
+            query.contentRating = { $in: ratingArray };
         }
 
         const sortOption = sort === 'popularity' ? '-popularityScore' : sort;
@@ -152,6 +156,7 @@ router.get('/:id', auth, async (req, res) => {
         const friendsProgress = await ReadingProgress.find({
             user: { $in: req.user.friends },
             story: story._id,
+            isPrivate: { $ne: true }, // Filter out private entries
         }).populate('user', 'username avatar');
 
         res.json({
@@ -205,6 +210,8 @@ router.put('/:id', [auth, upload.single('coverImage')], async (req, res) => {
         if (totalChapters !== undefined) story.totalChapters = totalChapters;
         if (req.body.contentRating !== undefined) story.contentRating = req.body.contentRating;
         if (req.body.year !== undefined) story.year = req.body.year;
+        if (req.body.anilistId !== undefined) story.anilistId = req.body.anilistId;
+        if (req.body.mangadexId !== undefined) story.mangadexId = req.body.mangadexId;
 
         await story.save();
         await story.populate('addedBy', 'username avatar');
