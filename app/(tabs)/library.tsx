@@ -266,7 +266,7 @@ export default function LibraryScreen() {
           {/* Full-bleed cover background */}
           {item.story?.coverImage ? (
             <Image
-              source={{ uri: item.story.coverImage }}
+              source={{ uri: api.resolveImageUrl(item.story?.coverImage) }}
               style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]}
               contentFit="cover"
               blurRadius={1}
@@ -287,7 +287,7 @@ export default function LibraryScreen() {
             {/* Left: cover thumbnail + status accent */}
             <View style={styles.libListLeft}>
               {item.story?.coverImage ? (
-                <Image source={{ uri: item.story.coverImage }} style={styles.libListThumb} contentFit="cover" />
+                <Image source={{ uri: api.resolveImageUrl(item.story.coverImage) }} style={styles.libListThumb} contentFit="cover" />
               ) : (
                 <View style={[styles.libListThumb, { backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }]}>
                   <IconSymbol name="book.fill" size={20} color="rgba(255,255,255,0.5)" />
@@ -355,7 +355,7 @@ export default function LibraryScreen() {
           activeOpacity={0.8}>
 
           {item.story?.coverImage ? (
-            <Image source={{ uri: item.story.coverImage }} style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]} contentFit="cover" />
+            <Image source={{ uri: api.resolveImageUrl(item.story.coverImage) }} style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%' }]} contentFit="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
               <IconSymbol name="book.fill" size={32} color={colors.textSecondary} />
@@ -411,7 +411,7 @@ export default function LibraryScreen() {
         onPress={() => router.push(`/story/${item.story?._id}` as any)}
         activeOpacity={0.7}>
         {item.story?.coverImage ? (
-          <Image source={{ uri: item.story.coverImage }} style={styles.compactCover} contentFit="cover" />
+          <Image source={{ uri: api.resolveImageUrl(item.story.coverImage) }} style={styles.compactCover} contentFit="cover" />
         ) : (
           <View style={[styles.compactCover, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
             <IconSymbol name="book.fill" size={20} color={colors.textSecondary} />

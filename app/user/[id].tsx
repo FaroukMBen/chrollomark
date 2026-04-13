@@ -351,7 +351,7 @@ export default function UserProfileScreen() {
                             <View>
                               {item.story?.coverImage ? (
                                 <Image
-                                  source={{ uri: item.story.coverImage }}
+                                  source={{ uri: api.resolveImageUrl(item.story?.coverImage) }}
                                   style={[
                                     viewMode === 'list' && styles.listProgressCover,
                                     viewMode === 'grid' && styles.gridCover,
