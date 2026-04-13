@@ -307,8 +307,10 @@ class ApiService {
         return this.request<any>(`/progress/${storyId}`, { method: 'DELETE' });
     }
 
-    async getUserProgress(userId: string) {
-        return this.request<any[]>(`/progress/user/${userId}`);
+    async getUserProgress(userId: string, includePrivate?: boolean) {
+        return this.request<any[]>(`/progress/user/${userId}`, {
+            params: includePrivate ? { includePrivate: 'true' } : undefined
+        });
     }
 
     // Reviews

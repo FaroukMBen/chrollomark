@@ -36,6 +36,7 @@ export default function UserProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'progress' | 'collections' | 'mutual'>('progress');
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'compact'>('list');
+  const [showHidden, setShowHidden] = useState(false);
   const [isConfirmVisible, setIsConfirmVisible] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
 
@@ -51,7 +52,7 @@ export default function UserProfileScreen() {
 
       // Try to load progress (requires friendship)
       try {
-        const progressData = await api.getUserProgress(id);
+        const progressData = await api.getUserProgress(id, showHidden);
         setProgress(progressData);
       } catch {
         // Not friends, can't see progress
@@ -61,7 +62,7 @@ export default function UserProfileScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, showHidden]);
 
   const showConfirm = (title: string, message: string, onConfirm: () => void) => {
     setConfirmConfig({ title, message, onConfirm });
@@ -74,7 +75,7 @@ export default function UserProfileScreen() {
       else if (action === 'cancel' || action === 'decline') await api.cancelFriendRequest(profile.requestStatus.requestId);
       else if (action === 'accept') await api.respondToFriendRequest(profile.requestStatus.requestId, 'accept');
       else if (action === 'remove') await api.removeFriend(id);
-      
+
       await loadData();
     } catch (error: any) {
       showToast({ message: error.message, type: 'error' });
@@ -125,7 +126,28 @@ export default function UserProfileScreen() {
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <IconSymbol name="arrow.left" size={24} color={colors.text} />
       </TouchableOpacity>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {currentUser?.role === 'admin' && (
+          <TouchableOpacity
+            style={[
+              styles.adminBadge,
+              {
+                backgroundColor: showHidden ? colors.error + '15' : colors.surfaceElevated,
+                borderColor: showHidden ? colors.error : colors.border
+              }
+            ]}
+            onPress={() => setShowHidden(!showHidden)}>
+            <IconSymbol
+              name={showHidden ? "eye.fill" : "eye.slash.fill"}
+              size={12}
+              color={showHidden ? colors.error : colors.textSecondary}
+            />
+            <Text style={[styles.adminBadgeText, { color: showHidden ? colors.error : colors.textSecondary }]}>
+              {showHidden ? 'Viewing Private Archive' : 'Admin: Show Hidden'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
 
         {/* Profile Header */}
@@ -227,10 +249,10 @@ export default function UserProfileScreen() {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'progress' && { backgroundColor: colors.surface }]}
             onPress={() => setActiveTab('progress')}>
-            <IconSymbol 
-              name="book.fill" 
-              size={14} 
-              color={activeTab === 'progress' ? colors.primary : colors.textSecondary} 
+            <IconSymbol
+              name="book.fill"
+              size={14}
+              color={activeTab === 'progress' ? colors.primary : colors.textSecondary}
             />
             <Text style={[styles.tabText, { color: activeTab === 'progress' ? colors.text : colors.textSecondary }]}>
               Reading
@@ -239,10 +261,10 @@ export default function UserProfileScreen() {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'collections' && { backgroundColor: colors.surface }]}
             onPress={() => setActiveTab('collections')}>
-            <IconSymbol 
-              name="folder.fill" 
-              size={14} 
-              color={activeTab === 'collections' ? colors.primary : colors.textSecondary} 
+            <IconSymbol
+              name="folder.fill"
+              size={14}
+              color={activeTab === 'collections' ? colors.primary : colors.textSecondary}
             />
             <Text style={[styles.tabText, { color: activeTab === 'collections' ? colors.text : colors.textSecondary }]}>
               Collections
@@ -251,10 +273,10 @@ export default function UserProfileScreen() {
           <TouchableOpacity
             style={[styles.tab, activeTab === 'mutual' && { backgroundColor: colors.surface }]}
             onPress={() => setActiveTab('mutual')}>
-            <IconSymbol 
-              name="person.2.fill" 
-              size={14} 
-              color={activeTab === 'mutual' ? colors.primary : colors.textSecondary} 
+            <IconSymbol
+              name="person.2.fill"
+              size={14}
+              color={activeTab === 'mutual' ? colors.primary : colors.textSecondary}
             />
             <Text style={[styles.tabText, { color: activeTab === 'mutual' ? colors.text : colors.textSecondary }]}>
               Mutual {mutualFriends.length > 0 && `(${mutualFriends.length})`}
@@ -281,111 +303,139 @@ export default function UserProfileScreen() {
                         key={item.mode}
                         style={[styles.toggleBtn, viewMode === item.mode && { backgroundColor: colors.surface }]}
                         onPress={() => setViewMode(item.mode as any)}>
-                        <IconSymbol 
-                          name={item.icon} 
-                          size={16} 
-                          color={viewMode === item.mode ? colors.primary : colors.textSecondary} 
+                        <IconSymbol
+                          name={item.icon}
+                          size={16}
+                          color={viewMode === item.mode ? colors.primary : colors.textSecondary}
                         />
                       </TouchableOpacity>
                     ))}
                   </View>
                 </View>
 
-                {progress.length === 0 ? (
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    No reading progress to show
-                  </Text>
-                ) : (
-                  <View style={viewMode === 'grid' ? styles.gridContainer : viewMode === 'compact' ? styles.compactGrid : null}>
-                    {progress.map((item: any) => {
-                      const itemKey = `${viewMode}-${item._id}`;
-                      return (
-                        <TouchableOpacity
-                          key={itemKey}
-                          style={[
-                            viewMode === 'list' && [styles.progressItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
-                            viewMode === 'grid' && [styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
-                            viewMode === 'compact' && styles.compactCard
-                          ]}
-                          onPress={() => router.push(`/story/${item.story?._id}` as any)}>
-                          
-                          {/* Cover Image */}
-                          <View>
-                            {item.story?.coverImage ? (
-                              <Image 
-                                source={{ uri: item.story.coverImage }} 
-                                style={[
+                {(() => {
+                  const filteredProgress = showHidden
+                    ? progress.filter(p => p.isPrivate)
+                    : progress;
+
+                  if (filteredProgress.length === 0) {
+                    return (
+                      <View style={styles.emptyContainer}>
+                        <IconSymbol
+                          name={showHidden ? "eye.slash.fill" : "tray.fill"}
+                          size={40}
+                          color={colors.textSecondary + '40'}
+                        />
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                          {showHidden ? 'This user has no hidden stories' : 'No public stories found'}
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View style={viewMode === 'grid' ? styles.gridContainer : viewMode === 'compact' ? styles.compactGrid : null}>
+                      {filteredProgress.map((item: any) => {
+                        const itemKey = `${viewMode}-${item._id}`;
+                        return (
+                          <TouchableOpacity
+                            key={itemKey}
+                            style={[
+                              viewMode === 'list' && [styles.progressItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
+                              viewMode === 'grid' && [styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
+                              viewMode === 'compact' && styles.compactCard
+                            ]}
+                            onPress={() => router.push(`/story/${item.story?._id}` as any)}>
+
+                            {/* Cover Image */}
+                            <View>
+                              {item.story?.coverImage ? (
+                                <Image
+                                  source={{ uri: item.story.coverImage }}
+                                  style={[
+                                    viewMode === 'list' && styles.listProgressCover,
+                                    viewMode === 'grid' && styles.gridCover,
+                                    viewMode === 'compact' && styles.compactCover,
+                                    { borderColor: colors.cardBorder }
+                                  ]}
+                                  contentFit="cover"
+                                />
+                              ) : (
+                                <View style={[
                                   viewMode === 'list' && styles.listProgressCover,
                                   viewMode === 'grid' && styles.gridCover,
                                   viewMode === 'compact' && styles.compactCover,
-                                  { borderColor: colors.cardBorder }
-                                ]} 
-                                contentFit="cover" 
-                              />
-                            ) : (
-                              <View style={[
-                                viewMode === 'list' && styles.listProgressCover,
-                                viewMode === 'grid' && styles.gridCover,
-                                viewMode === 'compact' && styles.compactCover,
-                                styles.placeholderCover, 
-                                { backgroundColor: colors.surfaceElevated }
-                              ]}>
-                                <IconSymbol name="book.fill" size={viewMode === 'compact' ? 20 : 24} color={colors.textSecondary} />
-                              </View>
-                            )}
-                            
-                            {/* Mutual Badge */}
-                            {item.isMutual && (
-                              <View style={[
-                                styles.mutualBadge, 
-                                { backgroundColor: colors.primary },
-                                viewMode === 'compact' && styles.mutualBadgeMini
-                              ]}>
-                                <IconSymbol name="person.2.fill" size={viewMode === 'compact' ? 8 : 10} color="#FFF" />
-                              </View>
-                            )}
-                          </View>
-  
-                          {/* Info Section */}
-                          {viewMode === 'list' && (
-                            <View style={styles.progressInfo}>
-                              <View style={styles.titleRow}>
-                                <Text style={[styles.progressTitle, { color: colors.text }]} numberOfLines={1}>{item.story?.title}</Text>
-                                {item.isMutual && (
-                                  <View style={[styles.mutualTag, { backgroundColor: colors.primary + '15' }]}>
-                                    <Text style={[styles.mutualTagText, { color: colors.primary }]}>Mutual</Text>
-                                  </View>
-                                )}
-                              </View>
-                              <View style={styles.progressMeta}>
-                                <View style={[styles.statusBadge, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
-                                  <Text style={[styles.statusText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
+                                  styles.placeholderCover,
+                                  { backgroundColor: colors.surfaceElevated }
+                                ]}>
+                                  <IconSymbol name="book.fill" size={viewMode === 'compact' ? 20 : 24} color={colors.textSecondary} />
                                 </View>
-                                <Text style={[styles.chapterText, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
-                              </View>
+                              )}
+
+                              {/* Mutual Badge */}
+                              {item.isMutual && (
+                                <View style={[
+                                  styles.mutualBadge,
+                                  { backgroundColor: colors.primary },
+                                  viewMode === 'compact' && styles.mutualBadgeMini
+                                ]}>
+                                  <IconSymbol name="person.2.fill" size={viewMode === 'compact' ? 8 : 10} color="#FFF" />
+                                </View>
+                              )}
+
+                              {/* Private Badge */}
+                              {item.isPrivate && (
+                                <View style={[
+                                  styles.privateBadge,
+                                  { backgroundColor: colors.error },
+                                  viewMode === 'compact' && styles.privateBadgeMini
+                                ]}>
+                                  <IconSymbol name="lock.fill" size={viewMode === 'compact' ? 8 : 10} color="#FFF" />
+                                </View>
+                              )}
                             </View>
-                          )}
-                          
-                          {viewMode === 'grid' && (
-                            <View style={styles.gridInfo}>
-                              <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>{item.story?.title}</Text>
-                              <View style={styles.gridMeta}>
-                                <View style={[styles.miniStatusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
-                                <Text style={[styles.gridChapter, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
+
+                            {/* Info Section */}
+                            {viewMode === 'list' && (
+                              <View style={styles.progressInfo}>
+                                <View style={styles.titleRow}>
+                                  <Text style={[styles.progressTitle, { color: colors.text }]} numberOfLines={1}>{item.story?.title}</Text>
+                                  {item.isMutual && (
+                                    <View style={[styles.mutualTag, { backgroundColor: colors.primary + '15' }]}>
+                                      <Text style={[styles.mutualTagText, { color: colors.primary }]}>Mutual</Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <View style={styles.progressMeta}>
+                                  <View style={[styles.statusBadge, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
+                                    <Text style={[styles.statusText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
+                                  </View>
+                                  <Text style={[styles.chapterText, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
+                                </View>
                               </View>
-                            </View>
-                          )}
-  
-                          {viewMode === 'compact' && (
-                            <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
-                              {item.story?.title}
-                            </Text>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
+                            )}
+
+                            {viewMode === 'grid' && (
+                              <View style={styles.gridInfo}>
+                                <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>{item.story?.title}</Text>
+                                <View style={styles.gridMeta}>
+                                  <View style={[styles.miniStatusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
+                                  <Text style={[styles.gridChapter, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
+                                </View>
+                              </View>
+                            )}
+
+                            {viewMode === 'compact' && (
+                              <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
+                                {item.story?.title}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
               </View>
             ) : (
               <View style={styles.locked}>
@@ -409,7 +459,7 @@ export default function UserProfileScreen() {
                   style={[styles.collectionItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
                   onPress={() => router.push(`/collection/${collection._id}` as any)}>
                   <View style={[styles.collectionColor, { backgroundColor: collection.color || colors.primary }]} />
-                   <View style={styles.collectionInfo}>
+                  <View style={styles.collectionInfo}>
                     <Text style={[styles.collectionName, { color: colors.text }]}>{collection.name}</Text>
                     <Text style={[styles.collectionCount, { color: colors.textSecondary }]}>
                       {collection.stories?.length || 0} stories
@@ -440,7 +490,7 @@ export default function UserProfileScreen() {
                   onPress={() => {
                     router.push(`/user/${friend._id}` as any);
                   }}>
-                   {friend.avatar ? (
+                  {friend.avatar ? (
                     <Image source={{ uri: friend.avatar }} style={styles.avatarMini} contentFit="cover" />
                   ) : (
                     <View style={[styles.avatarMini, { backgroundColor: colors.primary + '30' }]}>
@@ -468,7 +518,21 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingBottom: 60 },
   backButton: { position: 'absolute', top: 50, left: Spacing.md, zIndex: 10, padding: 8, borderRadius: 20 },
+  adminBadge: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    gap: 6,
+    marginTop: Spacing.md,
+    marginBottom: -Spacing.xs,
+  },
+  adminBadgeText: { fontSize: 11, fontWeight: '800' },
   profileHeader: { alignItems: 'center', paddingTop: Spacing.md, paddingBottom: Spacing.xs },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 12 },
   avatar: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.xs },
   avatarText: { color: '#FFF', fontSize: 28, fontWeight: '800' },
   name: { fontSize: 20, fontWeight: '800', marginBottom: 2 },
@@ -493,19 +557,19 @@ const styles = StyleSheet.create({
   addFriendText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
   removeFriendBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: BorderRadius.full, borderWidth: 1 },
   removeFriendText: { fontSize: 14, fontWeight: '700' },
-  tabs: { 
-    flexDirection: 'row', 
-    marginHorizontal: Spacing.lg, 
-    borderRadius: BorderRadius.lg, 
+  tabs: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.lg,
     padding: 4,
     borderWidth: 1,
     marginBottom: Spacing.md,
     marginTop: Spacing.sm,
   },
-  tab: { 
-    flex: 1, 
-    paddingVertical: 10, 
-    alignItems: 'center', 
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 6,
@@ -543,14 +607,14 @@ const styles = StyleSheet.create({
   compactCard: { width: '31%', marginBottom: Spacing.sm },
   compactCover: { width: '100%', height: 140, borderRadius: BorderRadius.md, borderWidth: 1 },
   compactTitle: { fontSize: 10, fontWeight: '600', marginTop: 4, textAlign: 'center' },
-  mutualBadge: { 
-    position: 'absolute', 
-    top: 6, 
-    right: 6, 
-    width: 20, 
-    height: 20, 
-    borderRadius: 10, 
-    justifyContent: 'center', 
+  mutualBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFF',
@@ -561,6 +625,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     top: 4,
     right: 4,
+    borderWidth: 1.5,
+  },
+  privateBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  privateBadgeMini: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    top: 4,
+    left: 4,
     borderWidth: 1.5,
   },
   collectionItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.lg, marginBottom: Spacing.sm, borderWidth: 1 },

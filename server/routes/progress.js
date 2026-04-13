@@ -282,10 +282,16 @@ router.get('/user/:userId', auth, async (req, res) => {
             return res.status(403).json({ message: 'You need to be friends to see their progress' });
         }
 
-        const progress = await ReadingProgress.find({ 
-                user: req.params.userId,
-                isPrivate: { $ne: true } // Hide private stories from friends
-            })
+        const { includePrivate } = req.query;
+        const isAdmin = req.user.role === 'admin';
+        const showPrivate = includePrivate === 'true' && isAdmin;
+
+        const query = { user: req.params.userId };
+        if (!showPrivate && req.params.userId !== req.user._id.toString()) {
+            query.isPrivate = { $ne: true };
+        }
+
+        const progress = await ReadingProgress.find(query)
             .sort('-lastReadDate')
             .populate('story', 'title coverImage type totalChapters author status averageRating genres');
 
