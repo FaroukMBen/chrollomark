@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppLogo } from '@/components/ui/app-logo';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, Shadows, Spacing, StatusColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -83,9 +84,7 @@ export default function HomeScreen() {
     return (
       <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.welcomeContainer}>
-          <View style={[styles.logoBg, { backgroundColor: colors.primary + '15' }]}>
-            <IconSymbol name="book.fill" size={48} color={colors.primary} />
-          </View>
+          <AppLogo size={100} style={{ marginBottom: Spacing.lg }} />
           <Text style={[styles.appName, { color: colors.text }]}>ChrolloMark</Text>
           <Text style={[styles.tagline, { color: colors.textSecondary }]}>
             Track your manga & webtoon{'\n'}reading progress
@@ -603,7 +602,6 @@ const styles = StyleSheet.create({
   devLogAction: { fontSize: 12, fontWeight: '700' },
   
   welcomeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
-  logoBg: { width: 100, height: 100, borderRadius: BorderRadius.xl, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.lg },
   appName: { fontSize: 36, fontWeight: '800', letterSpacing: -1, marginBottom: Spacing.sm },
   tagline: { fontSize: 16, textAlign: 'center', marginBottom: Spacing.xl, lineHeight: 24 },
   authButton: { width: '100%', paddingVertical: 16, borderRadius: BorderRadius.lg, alignItems: 'center', marginBottom: Spacing.md, ...Shadows.glow },
