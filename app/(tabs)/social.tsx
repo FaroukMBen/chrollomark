@@ -236,275 +236,343 @@ export default function SocialScreen() {
     { key: 'requests' as const, label: 'Requests', count: requests.length > 0 ? requests.length : null, icon: 'envelope.fill' },
   ];
 
-  // --- Feed renderers ---
-  const renderReviewItem = (item: any) => (
-    <View key={item.id} style={[styles.feedCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-      <TouchableOpacity 
-        style={styles.feedHeader} 
-        onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
-        activeOpacity={0.7}
-      >
-        {item.user?.avatar ? (
-          <Image source={{ uri: item.user.avatar }} style={styles.feedAvatar} contentFit="cover" />
-        ) : (
-          <View style={[styles.feedAvatar, { backgroundColor: colors.primary + '30' }]}>
-            <Text style={[styles.feedAvatarText, { color: colors.primary }]}>
-              {item.user?.username?.[0]?.toUpperCase()}
-            </Text>
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user?.username}</Text>
-            {item.user?._id === currentUser?._id && (
-              <View style={[styles.meBadge, { backgroundColor: colors.primary + '15' }]}>
-                <Text style={[styles.meBadgeText, { color: colors.primary }]}>YOU</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.feedAction, { color: colors.textSecondary }]}>reviewed a story</Text>
-        </View>
-        <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
-      </TouchableOpacity>
+  // ─── Activity type accent colors ───
+  const ACTIVITY_ACCENT = {
+    review:            { color: '#A78BFA', icon: 'star.fill' as const, label: 'REVIEW' },
+    progress:          { color: '#34D399', icon: 'bookmark.fill' as const, label: 'PROGRESS' },
+    grouped_progress:  { color: '#60A5FA', icon: 'list.bullet' as const, label: 'BULK UPDATE' },
+    recommendation:    { color: '#FBBF24', icon: 'sparkles' as const, label: 'RECOMMENDED' },
+    collection_update: { color: '#F97316', icon: 'folder.fill' as const, label: 'COLLECTION' },
+    dev_log:           { color: '#8B5CF6', icon: 'wrench.and.screwdriver.fill' as const, label: 'UPDATE' },
+  } as const;
 
-      <TouchableOpacity
-        style={[styles.feedStoryCard, { backgroundColor: colors.surfaceElevated }]}
-        onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
-        activeOpacity={0.7}>
-        {item.story?.coverImage ? (
-          <Image source={{ uri: item.story.coverImage }} style={styles.feedStoryCover} contentFit="cover" />
-        ) : (
-          <View style={[styles.feedStoryCover, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
-            <IconSymbol name="book.fill" size={20} color={colors.textSecondary} />
-          </View>
-        )}
-        <View style={styles.feedStoryInfo}>
-          <Text style={[styles.feedStoryTitle, { color: colors.text }]} numberOfLines={1}>
-            {item.story?.title || 'Unknown'}
-          </Text>
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Text key={star} style={{ fontSize: 14, color: star <= item.rating ? colors.accent : colors.textSecondary + '40' }}>
-                ★
-              </Text>
-            ))}
-          </View>
-          {item.text ? (
-            <Text style={[styles.feedReviewText, { color: colors.textSecondary }]} numberOfLines={3}>
-              "{item.text}"
-            </Text>
-          ) : null}
-        </View>
-      </TouchableOpacity>
-    </View>
+  // ─── Shared avatar block ───
+  const ActivityAvatar = ({ user, accentColor }: { user: any; accentColor: string }) => (
+    user?.avatar ? (
+      <Image source={{ uri: user.avatar }} style={styles.feedAvatar} contentFit="cover" />
+    ) : (
+      <View style={[styles.feedAvatar, { backgroundColor: accentColor + '25', borderWidth: 1.5, borderColor: accentColor + '50' }]}>
+        <Text style={[styles.feedAvatarText, { color: accentColor }]}>
+          {user?.username?.[0]?.toUpperCase()}
+        </Text>
+      </View>
+    )
   );
 
-  const renderProgressItem = (item: any) => {
-    const statusColor = StatusColors[item.status] || colors.primary;
-    const actionVerb = item.status === 'Completed' ? 'completed' :
-                       item.status === 'Reading' ? 'is reading' :
-                       item.status === 'Plan to Read' ? 'plans to read' :
-                       item.status === 'On Hold' ? 'put on hold' : 'dropped';
-
+  // ─── Review card ───
+  const renderReviewItem = (item: any) => {
+    const accent = ACTIVITY_ACCENT.review;
     return (
-      <View key={item.id} style={[styles.feedCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        <TouchableOpacity 
-          style={styles.feedHeader}
-          onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
-          activeOpacity={0.7}
-        >
-          {item.user?.avatar ? (
-            <Image source={{ uri: item.user.avatar }} style={styles.feedAvatar} contentFit="cover" />
-          ) : (
-            <View style={[styles.feedAvatar, { backgroundColor: statusColor + '30' }]}>
-              <Text style={[styles.feedAvatarText, { color: statusColor }]}>
-                {item.user?.username?.[0]?.toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user?.username}</Text>
-              {item.user?._id === currentUser?._id && (
-                <View style={[styles.meBadge, { backgroundColor: statusColor + '15' }]}>
-                  <Text style={[styles.meBadgeText, { color: statusColor }]}>YOU</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.feedAction, { color: colors.textSecondary }]}>{actionVerb}</Text>
-          </View>
-          <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
-        </TouchableOpacity>
+      <View key={item.id} style={[styles.actCard, { backgroundColor: colors.surface, borderColor: accent.color + '25' }]}>
+        {/* Colored left strip */}
+        <View style={[styles.actStrip, { backgroundColor: accent.color }]} />
 
-        <TouchableOpacity
-          style={[styles.feedStoryRow, { backgroundColor: colors.surfaceElevated }]}
-          onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
-          activeOpacity={0.7}>
-          {item.story?.coverImage ? (
-            <Image source={{ uri: item.story.coverImage }} style={styles.feedStoryThumb} contentFit="cover" />
-          ) : (
-            <View style={[styles.feedStoryThumb, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
-              <IconSymbol name="book.fill" size={16} color={colors.textSecondary} />
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.feedStoryTitle, { color: colors.text }]} numberOfLines={1}>
-              {item.story?.title || 'Unknown'}
-            </Text>
-            <View style={styles.feedProgressMeta}>
-              <View style={[styles.feedStatusPill, { backgroundColor: statusColor + '20' }]}>
-                <Text style={[styles.feedStatusText, { color: statusColor }]}>{item.status}</Text>
+        <View style={styles.actBody}>
+          {/* Header row */}
+          <TouchableOpacity
+            style={styles.actHeader}
+            onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
+            activeOpacity={0.7}>
+            <ActivityAvatar user={item.user} accentColor={accent.color} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.actUsername, { color: colors.text }]}>{item.user?.username}</Text>
+                {item.user?._id === currentUser?._id && (
+                  <View style={[styles.meBadge, { backgroundColor: accent.color + '20' }]}>
+                    <Text style={[styles.meBadgeText, { color: accent.color }]}>YOU</Text>
+                  </View>
+                )}
               </View>
-              {item.currentChapter > 0 && (
-                <Text style={[styles.feedChapter, { color: colors.textSecondary }]}>Ch. {item.currentChapter}</Text>
-              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                <View style={[styles.actTypePill, { backgroundColor: accent.color + '18' }]}>
+                  <IconSymbol name={accent.icon} size={8} color={accent.color} />
+                  <Text style={[styles.actTypeLabel, { color: accent.color }]}>{accent.label}</Text>
+                </View>
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
+            <Text style={[styles.actTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
+          </TouchableOpacity>
+
+          {/* Story banner */}
+          <TouchableOpacity
+            style={styles.reviewBanner}
+            onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
+            activeOpacity={0.8}>
+            {item.story?.coverImage ? (
+              <Image source={{ uri: item.story.coverImage }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+            ) : null}
+            {/* Dark gradient overlay */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.75)', 'rgba(0,0,0,0.92)']}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={styles.reviewBannerContent}>
+              {/* Stars */}
+              <View style={styles.starsRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                  {[1,2,3,4,5].map(s => (
+                    <Text key={s} style={{ fontSize: 13, color: s <= item.rating ? '#FBBF24' : 'rgba(255,255,255,0.2)' }}>★</Text>
+                  ))}
+                  <Text style={styles.ratingNum}>{item.rating}/5</Text>
+                </View>
+
+                {/* Optional progress point for the review */}
+                {(item.currentChapter > 0 || item.status === 'Completed') && (
+                  <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '900', color: '#FFF' }}>
+                      {item.status === 'Completed' 
+                        ? 'COMPLETED' 
+                        : (item.story?.type === 'Anime' 
+                           ? `S${item.currentSeason || 1} E${item.currentChapter}` 
+                           : `CH. ${item.currentChapter}`)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.reviewBannerTitle} numberOfLines={1}>{item.story?.title || 'Unknown'}</Text>
+              {item.text ? (
+                <Text style={styles.reviewBannerQuote} numberOfLines={2}>"{item.text}"</Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
 
-  const renderRecommendationItem = (item: any) => (
-    <View key={item.id} style={[styles.feedCard, styles.recoHighlightCard, { backgroundColor: colors.surface, borderColor: colors.accent + '40' }]}>
-      <LinearGradient 
-        colors={[colors.accent + '15', 'transparent']} 
-        start={{ x: 0, y: 0 }} 
-        end={{ x: 1, y: 1 }} 
-        style={StyleSheet.absoluteFill} 
-      />
-      <TouchableOpacity 
-        style={styles.feedHeader}
-        onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
-        activeOpacity={0.7}
-      >
-        {item.user?.avatar ? (
-          <Image source={{ uri: item.user.avatar }} style={styles.feedAvatar} contentFit="cover" />
-        ) : (
-          <View style={[styles.feedAvatar, { backgroundColor: colors.accent + '30' }]}>
-            <Text style={[styles.feedAvatarText, { color: colors.accent }]}>
-              {item.user?.username?.[0]?.toUpperCase()}
-            </Text>
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user?.username}</Text>
-            {item.user?._id === currentUser?._id && (
-              <View style={[styles.meBadge, { backgroundColor: colors.accent + '15' }]}>
-                <Text style={[styles.meBadgeText, { color: colors.accent }]}>YOU</Text>
+  // ─── Progress card ───
+  const renderProgressItem = (item: any) => {
+    const sColor = StatusColors[item.status] || colors.primary;
+    const isAnime = item.story?.type === 'Anime';
+    const actionVerb =
+      item.status === 'Completed'    ? (isAnime ? 'finished watching' : 'finished reading') :
+      item.status === 'Reading'      ? (isAnime ? 'is now watching' : 'is now reading') :
+      item.status === 'Plan to Read' ? (isAnime ? 'added to their watchlist' : 'added to their list') :
+      item.status === 'On Hold'      ? 'put on hold' : 'dropped';
+
+    const totalCh = item.story?.totalChapters;
+    const curCh   = item.currentChapter || 0;
+    const pct     = totalCh ? Math.min(Math.round((curCh / totalCh) * 100), 100) : 0;
+
+    return (
+      <View key={item.id} style={[styles.actCard, { backgroundColor: colors.surface, borderColor: sColor + '20' }]}>
+        <View style={[styles.actStrip, { backgroundColor: sColor }]} />
+
+        <View style={styles.actBody}>
+          <TouchableOpacity
+            style={styles.actHeader}
+            onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
+            activeOpacity={0.7}>
+            <ActivityAvatar user={item.user} accentColor={sColor} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.actUsername, { color: colors.text }]}>{item.user?.username}</Text>
+                {item.user?._id === currentUser?._id && (
+                  <View style={[styles.meBadge, { backgroundColor: sColor + '20' }]}>
+                    <Text style={[styles.meBadgeText, { color: sColor }]}>YOU</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.actSubline, { color: colors.textSecondary }]}>{actionVerb}</Text>
+            </View>
+            <Text style={[styles.actTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.progressStoryRow, { backgroundColor: colors.surfaceElevated }]}
+            onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
+            activeOpacity={0.8}>
+            {/* Cover */}
+            {item.story?.coverImage ? (
+              <Image source={{ uri: item.story.coverImage }} style={styles.progressCover} contentFit="cover" />
+            ) : (
+              <View style={[styles.progressCover, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+                <IconSymbol name="book.fill" size={18} color={colors.textSecondary} />
               </View>
             )}
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <IconSymbol name="sparkles" size={10} color={colors.accent} />
-            <Text style={[styles.feedAction, { color: colors.accent, fontWeight: '700' }]}>RECOMMENDED THIS STORY</Text>
-          </View>
-        </View>
-        <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.feedStoryCard, { backgroundColor: colors.surfaceElevated, borderLeftWidth: 3, borderLeftColor: colors.accent }]}
-        onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
-        activeOpacity={0.7}>
-        {item.story?.coverImage ? (
-          <Image source={{ uri: item.story.coverImage }} style={styles.feedStoryCover} contentFit="cover" />
-        ) : (
-          <View style={[styles.feedStoryCover, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
-            <IconSymbol name="book.fill" size={20} color={colors.textSecondary} />
-          </View>
-        )}
-        <View style={styles.feedStoryInfo}>
-          <Text style={[styles.feedStoryTitle, { color: colors.text }]} numberOfLines={1}>
-            {item.story?.title || 'Unknown'}
-          </Text>
-          <Text style={[styles.feedStoryAuthor, { color: colors.textSecondary }]} numberOfLines={1}>
-            {item.story?.author || 'Unknown Author'}
-          </Text>
-          <View style={[styles.typeBadge, { backgroundColor: colors.accent + '20', alignSelf: 'flex-start', marginTop: 4, marginBottom: item.message ? 8 : 0 }]}>
-              <Text style={[styles.typeText, { color: colors.accent }]}>MUST READ</Text>
-          </View>
-          {item.message && (
-            <View style={styles.feedRecoMessage}>
-              <Text style={[styles.feedReviewText, { color: colors.text, marginTop: 0, fontStyle: 'normal' }]}>"{item.message}"</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderGroupedProgressItem = (item: any) => {
-    const statusColor = colors.primary;
-    
-    return (
-      <View key={item.id} style={[styles.feedCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        <TouchableOpacity 
-          style={styles.feedHeader}
-          onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
-          activeOpacity={0.7}
-        >
-          {item.user?.avatar ? (
-            <Image source={{ uri: item.user.avatar }} style={styles.feedAvatar} contentFit="cover" />
-          ) : (
-            <View style={[styles.feedAvatar, { backgroundColor: statusColor + '30' }]}>
-              <Text style={[styles.feedAvatarText, { color: statusColor }]}>
-                {item.user?.username?.[0]?.toUpperCase()}
+            {/* Info */}
+            <View style={styles.progressInfo}>
+              <Text style={[styles.actTitle, { color: colors.text }]} numberOfLines={1}>
+                {item.story?.title || 'Unknown'}
               </Text>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user?.username}</Text>
-              {item.user?._id === currentUser?._id && (
-                <View style={[styles.meBadge, { backgroundColor: statusColor + '15' }]}>
-                  <Text style={[styles.meBadgeText, { color: statusColor }]}>YOU</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <View style={[styles.feedStatusPill, { backgroundColor: sColor + '20' }]}>
+                  <Text style={[styles.feedStatusText, { color: sColor }]}>{item.status}</Text>
                 </View>
-              )}
-            </View>
-            <Text style={[styles.feedAction, { color: colors.textSecondary }]}>updated {item.itemsCount} titles</Text>
-          </View>
-          <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
-        </TouchableOpacity>
-
-        <View style={styles.groupedContainer}>
-          {(item.stories || []).slice(0, expandedGroups.has(item.id) ? undefined : 2).map((subItem: any, idx: number) => (
-            <TouchableOpacity
-              key={idx}
-              style={[styles.groupedStoryRow, { backgroundColor: colors.surfaceElevated }]}
-              onPress={() => subItem.story?._id && router.push(`/story/${subItem.story._id}` as any)}
-              activeOpacity={0.7}>
-              {subItem.story?.coverImage ? (
-                <Image source={{ uri: subItem.story.coverImage }} style={styles.feedStoryThumbSmall} contentFit="cover" />
-              ) : (
-                <View style={[styles.feedStoryThumbSmall, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
-                  <IconSymbol name="book.fill" size={16} color={colors.textSecondary} />
-                </View>
-              )}
-              <View style={{ flex: 1, width: '100%' }}>
-                <Text style={[styles.feedStoryTitleSmall, { color: colors.text, marginTop: 6 }]} numberOfLines={1}>
-                  {subItem.story?.title || 'Unknown'}
-                </Text>
-                <Text style={[styles.feedChapterSmall, { color: colors.primary }]}>
-                   {subItem.status === 'Completed' ? 'Completed' : `Chapter ${subItem.currentChapter}`}
-                </Text>
+                {curCh > 0 && (
+                  <Text style={[styles.progressChText, { color: colors.textSecondary }]}>
+                    {item.story?.type === 'Anime' ? `S${item.currentSeason || 1} E${curCh}` : `Ch. ${curCh}`}
+                    {totalCh ? ` / ${totalCh}` : ''}
+                  </Text>
+                )}
               </View>
-            </TouchableOpacity>
-          ))}
-          {item.itemsCount > 2 && (
-            <TouchableOpacity 
+              {/* Progress bar */}
+              {totalCh ? (
+                <View style={styles.progressBarTrack}>
+                  <View style={[styles.progressBarFill, { width: `${pct}%` as any, backgroundColor: sColor }]} />
+                </View>
+              ) : null}
+            </View>
+            <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // ─── Recommendation card ───
+  const renderRecommendationItem = (item: any) => {
+    const accent = ACTIVITY_ACCENT.recommendation;
+    return (
+      <View key={item.id} style={[styles.actCard, { backgroundColor: colors.surface, borderColor: accent.color + '35' }]}>
+        <View style={[styles.actStrip, { backgroundColor: accent.color }]} />
+        <LinearGradient
+          colors={[accent.color + '0D', 'transparent']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.6 }}
+          style={StyleSheet.absoluteFill}
+        />
+
+        <View style={styles.actBody}>
+          <TouchableOpacity
+            style={styles.actHeader}
+            onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
+            activeOpacity={0.7}>
+            <ActivityAvatar user={item.user} accentColor={accent.color} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.actUsername, { color: colors.text }]}>{item.user?.username}</Text>
+                {item.user?._id === currentUser?._id && (
+                  <View style={[styles.meBadge, { backgroundColor: accent.color + '20' }]}>
+                    <Text style={[styles.meBadgeText, { color: accent.color }]}>YOU</Text>
+                  </View>
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                <View style={[styles.actTypePill, { backgroundColor: accent.color + '18' }]}>
+                  <IconSymbol name={accent.icon} size={8} color={accent.color} />
+                  <Text style={[styles.actTypeLabel, { color: accent.color }]}>{accent.label}</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={[styles.actTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.recoStoryRow}
+            onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
+            activeOpacity={0.8}>
+            {item.story?.coverImage ? (
+              <Image source={{ uri: item.story.coverImage }} style={styles.recoCover} contentFit="cover" />
+            ) : (
+              <View style={[styles.recoCover, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
+                <IconSymbol name="book.fill" size={20} color={colors.textSecondary} />
+              </View>
+            )}
+            <View style={styles.recoInfo}>
+              <View style={[styles.mustReadBadge, { backgroundColor: accent.color + '20', borderColor: accent.color + '40' }]}>
+                <IconSymbol name="sparkles" size={9} color={accent.color} />
+                <Text style={[styles.mustReadText, { color: accent.color }]}>MUST READ</Text>
+              </View>
+              <Text style={[styles.actTitle, { color: colors.text }]} numberOfLines={2}>
+                {item.story?.title || 'Unknown'}
+              </Text>
+              <Text style={[styles.actSubline, { color: colors.textSecondary }]} numberOfLines={1}>
+                {item.story?.author || ''}
+              </Text>
+              {item.message ? (
+                <View style={[styles.recoQuoteBox, { borderColor: accent.color + '30', backgroundColor: accent.color + '08' }]}>
+                  <Text style={[styles.recoQuoteText, { color: colors.text }]} numberOfLines={3}>
+                    "{item.message}"
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // ─── Grouped progress card ───
+  const renderGroupedProgressItem = (item: any) => {
+    const accent = ACTIVITY_ACCENT.grouped_progress;
+    return (
+      <View key={item.id} style={[styles.actCard, { backgroundColor: colors.surface, borderColor: accent.color + '25' }]}>
+        <View style={[styles.actStrip, { backgroundColor: accent.color }]} />
+
+        <View style={styles.actBody}>
+          <TouchableOpacity
+            style={styles.actHeader}
+            onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
+            activeOpacity={0.7}>
+            <ActivityAvatar user={item.user} accentColor={accent.color} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.actUsername, { color: colors.text }]}>{item.user?.username}</Text>
+                {item.user?._id === currentUser?._id && (
+                  <View style={[styles.meBadge, { backgroundColor: accent.color + '20' }]}>
+                    <Text style={[styles.meBadgeText, { color: accent.color }]}>YOU</Text>
+                  </View>
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                <View style={[styles.actTypePill, { backgroundColor: accent.color + '18' }]}>
+                  <IconSymbol name={accent.icon} size={8} color={accent.color} />
+                  <Text style={[styles.actTypeLabel, { color: accent.color }]}>{item.itemsCount} TITLES UPDATED</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={[styles.actTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
+          </TouchableOpacity>
+
+          {/* Cover grid */}
+          <View style={styles.groupGrid}>
+            {(item.stories || []).slice(0, expandedGroups.has(item.id) ? undefined : 4).map((subItem: any, idx: number) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.groupGridCell}
+                onPress={() => subItem.story?._id && router.push(`/story/${subItem.story._id}` as any)}
+                activeOpacity={0.8}>
+                {subItem.story?.coverImage ? (
+                  <Image source={{ uri: subItem.story.coverImage }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                ) : (
+                  <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
+                    <IconSymbol name="book.fill" size={16} color={colors.textSecondary} />
+                  </View>
+                )}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.75)']}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <View style={styles.groupCellLabel}>
+                  <Text style={styles.groupCellTitle} numberOfLines={2}>
+                    {subItem.story?.title}
+                  </Text>
+                  <Text style={[styles.groupCellCh, { color: accent.color }]}>
+                    {subItem.status === 'Completed' 
+                      ? '✓ Done' 
+                      : (subItem.story?.type === 'Anime' 
+                        ? `S${subItem.currentSeason || 1} E${subItem.currentChapter}` 
+                        : `Ch.${subItem.currentChapter}`)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {item.itemsCount > 4 && (
+            <TouchableOpacity
               style={[styles.moreActivityBtn, { borderTopWidth: 1, borderTopColor: colors.border + '30' }]}
               onPress={() => toggleGroup(item.id)}>
-              <Text style={[styles.moreActivityText, { color: colors.primary }]}>
-                {expandedGroups.has(item.id) 
-                  ? 'Show less' 
-                  : `Show ${item.itemsCount - 2} more updates`}
+              <Text style={[styles.moreActivityText, { color: accent.color }]}>
+                {expandedGroups.has(item.id)
+                  ? 'Show less'
+                  : `+ ${item.itemsCount - 4} more updates`}
               </Text>
-              <IconSymbol 
-                name={expandedGroups.has(item.id) ? 'chevron.up' : 'chevron.down'} 
-                size={12} 
-                color={colors.primary} 
+              <IconSymbol
+                name={expandedGroups.has(item.id) ? 'chevron.up' : 'chevron.down'}
+                size={12}
+                color={accent.color}
                 style={{ marginLeft: 4 }}
               />
             </TouchableOpacity>
@@ -514,91 +582,121 @@ export default function SocialScreen() {
     );
   };
 
-  const renderCollectionUpdateItem = (item: any) => (
-    <View key={item.id} style={[styles.feedCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-      <TouchableOpacity 
-        style={styles.feedHeader}
-        onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
-        activeOpacity={0.7}
-      >
-        {item.user?.avatar ? (
-          <Image source={{ uri: item.user.avatar }} style={styles.feedAvatar} contentFit="cover" />
-        ) : (
-          <View style={[styles.feedAvatar, { backgroundColor: '#F59E0B' + '30' }]}>
-            <Text style={[styles.feedAvatarText, { color: '#F59E0B' }]}>
-              {item.user?.username?.[0]?.toUpperCase()}
-            </Text>
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.feedUserName, { color: colors.text }]}>{item.user?.username}</Text>
-            {item.user?._id === currentUser?._id && (
-              <View style={[styles.meBadge, { backgroundColor: '#F59E0B' + '15' }]}>
-                <Text style={[styles.meBadgeText, { color: '#F59E0B' }]}>YOU</Text>
+  // ─── Collection update card ───
+  const renderCollectionUpdateItem = (item: any) => {
+    const accent = ACTIVITY_ACCENT.collection_update;
+    return (
+      <View key={item.id} style={[styles.actCard, { backgroundColor: colors.surface, borderColor: accent.color + '25' }]}>
+        <View style={[styles.actStrip, { backgroundColor: accent.color }]} />
+
+        <View style={styles.actBody}>
+          <TouchableOpacity
+            style={styles.actHeader}
+            onPress={() => item.user?._id && router.push(`/user/${item.user._id}` as any)}
+            activeOpacity={0.7}>
+            <ActivityAvatar user={item.user} accentColor={accent.color} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.actUsername, { color: colors.text }]}>{item.user?.username}</Text>
+                {item.user?._id === currentUser?._id && (
+                  <View style={[styles.meBadge, { backgroundColor: accent.color + '20' }]}>
+                    <Text style={[styles.meBadgeText, { color: accent.color }]}>YOU</Text>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-          <Text style={[styles.feedAction, { color: colors.textSecondary }]}>
-            {item.isNew ? 'created a new collection' : 'updated a collection'}
-          </Text>
-        </View>
-        <Text style={[styles.feedTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
-      </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                <View style={[styles.actTypePill, { backgroundColor: accent.color + '18' }]}>
+                  <IconSymbol name={accent.icon} size={8} color={accent.color} />
+                  <Text style={[styles.actTypeLabel, { color: accent.color }]}>
+                    {item.isNew ? 'NEW COLLECTION' : 'COLLECTION'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <Text style={[styles.actTime, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
+          </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.collectionActivityCard, { backgroundColor: colors.surfaceElevated, borderLeftWidth: 3, borderLeftColor: '#F59E0B' }]}
-        onPress={() => item.collectionId && router.push(`/collection/${item.collectionId}` as any)}
-        activeOpacity={0.7}>
-        <View style={[styles.collIconBg, { backgroundColor: '#F59E0B' + '20' }]}>
-          <IconSymbol name="folder.fill" size={24} color="#F59E0B" />
+          <TouchableOpacity
+            style={[styles.collectionRowCard, { backgroundColor: colors.surfaceElevated, borderColor: accent.color + '30' }]}
+            onPress={() => item.collectionId && router.push(`/collection/${item.collectionId}` as any)}
+            activeOpacity={0.8}>
+            <View style={[styles.collIconBg, { backgroundColor: accent.color + '18' }]}>
+              <IconSymbol name="folder.fill" size={22} color={accent.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.actTitle, { color: colors.text }]} numberOfLines={1}>
+                {item.name || 'A Collection'}
+              </Text>
+              <Text style={[styles.actSubline, { color: colors.textSecondary }]}>
+                {item.isNew ? 'Just created' : 'Updated'} · Tap to explore
+              </Text>
+            </View>
+            <IconSymbol name="chevron.right" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
-        <View style={styles.feedStoryInfo}>
-          <Text style={[styles.feedStoryTitle, { color: colors.text }]} numberOfLines={1}>
-            {item.name || 'Personal Collection'}
-          </Text>
-          <Text style={[styles.feedStoryAuthor, { color: colors.textSecondary }]}>
-            Click to view collection
-          </Text>
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
+      </View>
+    );
+  };
 
+  // ─── Dev Log card ───
   const renderDevLogItem = (item: any) => (
     <TouchableOpacity
       key={item.id}
-      style={[styles.feedCard, styles.devLogCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
+      style={[styles.devLogCard, { borderColor: colors.primary + '35' }]}
       onPress={() => router.push('/profile/dev-log')}
       activeOpacity={0.9}>
       <LinearGradient
-        colors={[colors.primary + '15', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
+        colors={[colors.primary + '25', colors.primary + '08', 'transparent']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
       />
-      <View style={styles.devLogHeader}>
+      {/* Decorative corner glow */}
+      <View style={[styles.devLogGlow, { backgroundColor: colors.primary }]} />
+
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <View style={[styles.devLogBadge, { backgroundColor: colors.primary }]}>
-          <Text style={styles.devLogBadgeText}>SYSTEM UPDATE</Text>
+          <IconSymbol name="wrench.and.screwdriver.fill" size={9} color="#FFF" />
+          <Text style={styles.devLogBadgeText}>PATCH NOTES</Text>
         </View>
         <Text style={[styles.devLogDate, { color: colors.textSecondary }]}>{timeAgo(item.timestamp)}</Text>
       </View>
 
-      <View style={styles.devLogContent}>
-        <Text style={[styles.devLogTitle, { color: colors.text }]} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={[styles.devLogSnippet, { color: colors.textSecondary }]} numberOfLines={2}>
-          {item.content}
-        </Text>
+      <Text style={[styles.devLogTitle, { color: colors.text }]} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text style={[styles.devLogSnippet, { color: colors.textSecondary }]} numberOfLines={2}>
+        {item.content}
+      </Text>
 
-        <View style={styles.devLogFooter}>
-          <Text style={[styles.viewDevLogText, { color: colors.primary }]}>View Patch Notes</Text>
-          <IconSymbol name="chevron.right" size={12} color={colors.primary} />
-        </View>
+      <View style={[styles.devLogFooter, { borderTopColor: colors.primary + '25' }]}>
+        <Text style={[styles.viewDevLogText, { color: colors.primary }]}>Read full notes</Text>
+        <IconSymbol name="chevron.right" size={11} color={colors.primary} />
       </View>
     </TouchableOpacity>
   );
+  
+  const renderDateSeparator = (timestamp: string) => {
+    const d = new Date(timestamp);
+    const now = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+
+    let dateLabel = '';
+    if (d.toDateString() === now.toDateString()) {
+      dateLabel = 'Today';
+    } else if (d.toDateString() === yesterday.toDateString()) {
+      dateLabel = 'Yesterday';
+    } else {
+      dateLabel = d.toLocaleDateString([], { month: 'long', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    }
+
+    return (
+      <View key={`sep-${timestamp}`} style={styles.dateSeparator}>
+        <Text style={[styles.dateSeparatorLabel, { color: colors.textSecondary }]}>{dateLabel.toUpperCase()}</Text>
+        <View style={styles.dateSeparatorLine} />
+      </View>
+    );
+  };
 
 
   return (
@@ -658,29 +756,45 @@ export default function SocialScreen() {
           {/* ===  ACTIVITY TAB  === */}
           {activeTab === 'activity' && (
             <>
-              {/* Feed */}
               {feed.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <View style={[styles.emptyIconBg, { backgroundColor: colors.surfaceElevated }]}>
-                    <IconSymbol name="flame.fill" size={40} color={colors.textSecondary} />
+                  <View style={[styles.actEmptyIconWrap, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                    <IconSymbol name="flame.fill" size={36} color={colors.primary} />
                   </View>
-                  <Text style={[styles.emptyTitle, { color: colors.text }]}>No activity yet</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Your feed is quiet</Text>
                   <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    Add friends to see their reading activity, reviews, and recommendations
+                    Add friends to see their reading progress, reviews and recommendations here.
                   </Text>
                 </View>
               ) : (
                 <>
-                  <Text style={[styles.feedSectionTitle, { color: colors.textSecondary }]}>RECENT ACTIVITY</Text>
-                  {feed.map((item) => {
-                    if (item.type === 'review') return renderReviewItem(item);
-                    if (item.type === 'progress') return renderProgressItem(item);
-                    if (item.type === 'recommendation') return renderRecommendationItem(item);
-                    if (item.type === 'grouped_progress') return renderGroupedProgressItem(item);
-                    if (item.type === 'collection_update') return renderCollectionUpdateItem(item);
-                    if (item.type === 'dev_log') return renderDevLogItem(item);
-                    return null;
-                  })}
+                  <View style={styles.feedSectionHeader}>
+                    <Text style={[styles.feedSectionTitle, { color: colors.textSecondary }]}>RECENT ACTIVITY</Text>
+                    <Text style={[styles.feedCountBadge, { color: colors.primary, backgroundColor: colors.primary + '15' }]}>
+                      {feed.length}
+                    </Text>
+                  </View>
+                  {(() => {
+                    let lastDateString = '';
+                    return feed.map((item) => {
+                      const itemDate = new Date(item.timestamp);
+                      const currentDateString = itemDate.toDateString();
+                      const showSeparator = currentDateString !== lastDateString;
+                      lastDateString = currentDateString;
+
+                      return (
+                        <View key={item.id}>
+                          {showSeparator && renderDateSeparator(item.timestamp)}
+                          {item.type === 'review' && renderReviewItem(item)}
+                          {item.type === 'progress' && renderProgressItem(item)}
+                          {item.type === 'recommendation' && renderRecommendationItem(item)}
+                          {item.type === 'grouped_progress' && renderGroupedProgressItem(item)}
+                          {item.type === 'collection_update' && renderCollectionUpdateItem(item)}
+                          {item.type === 'dev_log' && renderDevLogItem(item)}
+                        </View>
+                      );
+                    });
+                  })()}
                 </>
               )}
             </>
@@ -1082,83 +1196,111 @@ const styles = StyleSheet.create({
   },
   content: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 100 },
 
-  // --- Feed Styles ---
-  feedSectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: Spacing.md, marginTop: Spacing.sm },
-  feedCard: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
+  // ─── Activity Feed Styles ───
+  feedSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md, marginTop: Spacing.xs },
+  feedSectionTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  feedCountBadge: { fontSize: 11, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.full },
+  actEmptyIconWrap: { width: 88, height: 88, borderRadius: BorderRadius.xl, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1 },
+
+  // Activity card shell
+  actCard: {
+    flexDirection: 'row',
+    borderRadius: BorderRadius.xl,
+    marginBottom: 12,
     borderWidth: 1,
     overflow: 'hidden',
+    ...Shadows.sm,
   },
-  recoHighlightCard: {
-    borderWidth: 1.5,
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  feedHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
-  feedAvatar: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  actStrip: { width: 3, flexShrink: 0 },
+  actBody: { flex: 1, padding: Spacing.md },
+  actHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+  feedAvatar: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
   feedAvatarText: { fontSize: 15, fontWeight: '800' },
-  feedUserName: { fontSize: 14, fontWeight: '700' },
-  feedAction: { fontSize: 12 },
-  feedTime: { fontSize: 11 },
-  feedStoryCard: { borderRadius: BorderRadius.md, overflow: 'hidden' },
-  feedStoryCover: { width: '100%', height: 160, borderRadius: BorderRadius.sm },
-  feedStoryInfo: { padding: Spacing.sm, gap: 4 },
-  feedStoryTitle: { fontSize: 16, fontWeight: '800' },
-  feedStoryAuthor: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#94A3B8',
-    marginBottom: 2,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  typeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  feedReviewText: { fontSize: 13, lineHeight: 19, fontStyle: 'italic', marginTop: 4 },
-  starsRow: { flexDirection: 'row', gap: 2 },
-  feedStoryRow: { flexDirection: 'row', borderRadius: BorderRadius.md, padding: Spacing.sm, gap: Spacing.md, alignItems: 'center' },
-  feedStoryThumb: { width: 60, height: 85, borderRadius: BorderRadius.md },
+  actUsername: { fontSize: 14, fontWeight: '800', letterSpacing: -0.2 },
+  actSubline: { fontSize: 12, marginTop: 1, fontWeight: '500' },
+  actTime: { fontSize: 11, fontWeight: '500', marginTop: 2 },
+  actTitle: { fontSize: 14, fontWeight: '800', letterSpacing: -0.2 },
+  actTypePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: BorderRadius.full },
+  actTypeLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+
+  // Review card
+  reviewBanner: { height: 160, borderRadius: BorderRadius.lg, overflow: 'hidden', justifyContent: 'flex-end' },
+  reviewBannerContent: { padding: 12 },
+  starsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  ratingNum: { fontSize: 11, fontWeight: '800', color: '#FBBF24', marginLeft: 4 },
+  reviewBannerTitle: { fontSize: 16, fontWeight: '900', color: '#FFF', letterSpacing: -0.3, marginBottom: 3 },
+  reviewBannerQuote: { fontSize: 12, color: 'rgba(255,255,255,0.75)', fontStyle: 'italic', lineHeight: 17 },
+
+  // Progress card
+  progressStoryRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: BorderRadius.lg },
+  progressCover: { width: 50, height: 70, borderRadius: BorderRadius.md },
+  progressInfo: { flex: 1 },
+  progressChText: { fontSize: 11, fontWeight: '600' },
+  progressBarTrack: { height: 3, borderRadius: 2, backgroundColor: 'rgba(148,163,184,0.15)', marginTop: 8, overflow: 'hidden' },
+  progressBarFill: { height: '100%', borderRadius: 2 },
   feedProgressMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   feedStatusPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.full },
   feedStatusText: { fontSize: 10, fontWeight: '800' },
-  // Grouped Progress Styles
-  groupedContainer: { marginTop: Spacing.xs, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  groupedStoryRow: { width: '48%', padding: 4, borderRadius: BorderRadius.md, marginBottom: Spacing.sm },
-  feedStoryThumbSmall: { width: '100%', aspectRatio: 0.7, borderRadius: BorderRadius.sm },
-  feedStoryTitleSmall: { fontSize: 13, fontWeight: '800' },
-  feedChapterSmall: { fontSize: 11, fontWeight: '700', marginTop: 1 },
-  moreActivityBtn: { width: '100%', paddingVertical: Spacing.sm, alignItems: 'center' },
-  moreActivityText: { fontSize: 12, fontWeight: '600' },
-  // Collection Activity Styles
-  collectionActivityCard: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.lg, gap: Spacing.md },
-  collIconBg: { width: 44, height: 44, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
-  // Dev Log Styles
+  feedChapter: { fontSize: 12, fontWeight: '600' },
+
+  // Recommendation card
+  recoStoryRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  recoCover: { width: 80, height: 110, borderRadius: BorderRadius.md },
+  recoInfo: { flex: 1, gap: 5 },
+  mustReadBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 7, paddingVertical: 3, borderRadius: BorderRadius.full, borderWidth: 1 },
+  mustReadText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  recoQuoteBox: { marginTop: 4, padding: 9, borderRadius: BorderRadius.md, borderWidth: 1 },
+  recoQuoteText: { fontSize: 12, lineHeight: 17, fontStyle: 'italic' },
+
+  // Grouped (bulk update) card
+  groupGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  groupGridCell: { width: '47.5%', aspectRatio: 0.75, borderRadius: BorderRadius.md, overflow: 'hidden', justifyContent: 'flex-end' },
+  groupCellLabel: { padding: 6 },
+  groupCellTitle: { fontSize: 11, fontWeight: '800', color: '#FFF', lineHeight: 14, marginBottom: 2 },
+  groupCellCh: { fontSize: 10, fontWeight: '700' },
+  moreActivityBtn: { width: '100%', paddingVertical: Spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  moreActivityText: { fontSize: 12, fontWeight: '700' },
+
+  // Collection card
+  collectionRowCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: BorderRadius.lg, borderWidth: 1 },
+  collIconBg: { width: 42, height: 42, borderRadius: BorderRadius.md, justifyContent: 'center', alignItems: 'center' },
+
+  // Dev Log card
   devLogCard: {
-    padding: Spacing.lg,
     borderRadius: BorderRadius.xl,
-    marginBottom: Spacing.md,
+    padding: Spacing.lg,
+    marginBottom: 12,
     overflow: 'hidden',
+    borderWidth: 1,
     ...Shadows.md,
   },
-  devLogHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  devLogBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.sm },
+  devLogGlow: { position: 'absolute', top: -30, right: -30, width: 80, height: 80, borderRadius: 40, opacity: 0.08 },
+  devLogBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: BorderRadius.full },
   devLogBadgeText: { color: '#FFF', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   devLogDate: { fontSize: 11, fontWeight: '600' },
-  devLogContent: { paddingHorizontal: 0 },
-  devLogTitle: { fontSize: 18, fontWeight: '900', letterSpacing: -0.4, marginBottom: 8 },
-  devLogSnippet: { fontSize: 13, lineHeight: 18, marginBottom: 16 },
-  devLogFooter: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  devLogTitle: { fontSize: 18, fontWeight: '900', letterSpacing: -0.4, marginBottom: 6 },
+  devLogSnippet: { fontSize: 13, lineHeight: 18, marginBottom: 14 },
+  devLogFooter: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: 10, borderTopWidth: 1 },
   viewDevLogText: { fontSize: 12, fontWeight: '700' },
+
+  dateSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+    gap: Spacing.md,
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(148, 163, 184, 0.1)',
+  },
+  dateSeparatorLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+
   meBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -1171,26 +1313,31 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.5,
   },
-  feedChapter: { fontSize: 12, fontWeight: '600' },
-  feedRecoMessage: {
-    marginTop: 8,
-    padding: 10,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(245, 158, 11, 0.4)',
-  },
+  feedReviewText: { fontSize: 13, lineHeight: 19, fontStyle: 'italic', marginTop: 4 },
+  // kept for legacy compat
+  feedStoryCard: { borderRadius: BorderRadius.md, overflow: 'hidden' },
+  feedStoryCover: { width: '100%', height: 160, borderRadius: BorderRadius.sm },
+  feedStoryInfo: { padding: Spacing.sm, gap: 4 },
+  feedStoryTitle: { fontSize: 16, fontWeight: '800' },
+  feedStoryAuthor: { fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 2 },
+  feedStoryRow: { flexDirection: 'row', borderRadius: BorderRadius.md, padding: Spacing.sm, gap: Spacing.md, alignItems: 'center' },
+  feedStoryThumb: { width: 60, height: 85, borderRadius: BorderRadius.md },
+  feedStoryThumbSmall: { width: '100%', aspectRatio: 0.7, borderRadius: BorderRadius.sm },
+  feedStoryTitleSmall: { fontSize: 13, fontWeight: '800' },
+  feedChapterSmall: { fontSize: 11, fontWeight: '700', marginTop: 1 },
+  typeBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  typeText: { fontSize: 10, fontWeight: '800' },
+  feedUserName: { fontSize: 14, fontWeight: '700' },
+  feedAction: { fontSize: 12 },
+  feedTime: { fontSize: 11 },
+  feedCard: { padding: Spacing.md, borderRadius: BorderRadius.lg, marginBottom: Spacing.md, borderWidth: 1, overflow: 'hidden' },
+  recoHighlightCard: { borderWidth: 1.5, shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 },
+  feedHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  groupedContainer: { marginTop: Spacing.xs, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  groupedStoryRow: { width: '48%', padding: 4, borderRadius: BorderRadius.md, marginBottom: Spacing.sm },
+  feedRecoMessage: { marginTop: 8, padding: 10, borderRadius: BorderRadius.sm, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(245, 158, 11, 0.4)' },
 
-  // --- Recommendations ---
-  recoSection: { marginBottom: Spacing.lg },
-  recoHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.md },
-  recoTitle: { fontSize: 16, fontWeight: '700' },
-  recoList: { gap: Spacing.md },
-  recoCard: { width: 130, borderRadius: BorderRadius.lg, borderWidth: 1, overflow: 'hidden' },
-  recoCover: { width: '100%', height: 175 },
-  recoStoryTitle: { fontSize: 13, fontWeight: '700', paddingHorizontal: 8, paddingTop: 8, height: 50, lineHeight: 17 },
-  recoFriends: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingBottom: 10 },
-  recoFriendsText: { fontSize: 11, fontWeight: '600' },
+
 
   // --- User Cards ---
   userCard: {

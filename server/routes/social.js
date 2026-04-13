@@ -296,6 +296,7 @@ router.get('/activity', auth, async (req, res) => {
         // Get recent reading updates from friends
         const recentActivity = await ReadingProgress.find({
             user: { $in: friendIds },
+            isPrivate: { $ne: true }, // Filter private activity
             lastReadDate: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         })
             .sort('-lastReadDate')
@@ -336,6 +337,7 @@ router.get('/feed', auth, async (req, res) => {
         // 2) User & Friend progress updates (last 7 days)
         const recentProgress = await ReadingProgress.find({
             user: { $in: activityUserIds },
+            isPrivate: { $ne: true }, // Filter private progress
             lastReadDate: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         })
             .sort('-lastReadDate')
@@ -485,6 +487,7 @@ router.get('/feed', auth, async (req, res) => {
         // 4) Recommendations: stories that multiple friends have read and rated highly
         const friendProgress = await ReadingProgress.find({
             user: { $in: user.friends },
+            isPrivate: { $ne: true }, // Hide private stories from recommendations
             status: { $in: ['Reading', 'Completed'] },
         }).populate('story', 'title coverImage type author averageRating totalReaders');
 

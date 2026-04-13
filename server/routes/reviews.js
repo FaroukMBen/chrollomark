@@ -118,8 +118,12 @@ router.delete('/:id', auth, async (req, res) => {
         const storyId = review.story;
         await review.deleteOne();
 
-        // Calculate popularity (centralized)
-        await story.calculatePopularity();
+        // Update story stats and calculate popularity
+        const story = await Story.findById(storyId);
+        if (story) {
+            story.totalReviews = Math.max(0, (story.totalReviews || 0) - 1);
+            await story.calculatePopularity();
+        }
 
         res.json({ message: 'Review deleted' });
     } catch (error) {
