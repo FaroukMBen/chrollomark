@@ -344,10 +344,15 @@ router.post('/clone-mangadex', auth, async (req, res) => {
                 story.status = mappedStatus;
                 updated = true;
             }
-            if (coverImage && coverImage !== story.coverImage && !story.coverImage.startsWith('/api/images/')) {
-                // Save external image locally
+            if (coverImage && coverImage.startsWith('http')) {
+                // New remote URL provided - download and replace
                 const imageId = await saveExternalImage(coverImage);
                 if (imageId) {
+                    // Cleanup old local image if it exists
+                    if (story.coverImage && story.coverImage.startsWith('/api/images/')) {
+                        const oldId = story.coverImage.split('/').pop();
+                        await deleteFromGridFS(oldId);
+                    }
                     story.coverImage = `/api/images/${imageId}`;
                     updated = true;
                 }
@@ -418,10 +423,15 @@ router.post('/clone-anilist', auth, async (req, res) => {
                 story.status = status;
                 updated = true;
             }
-            if (coverImage && coverImage !== story.coverImage && !story.coverImage.startsWith('/api/images/')) {
-                // Save external image locally
+            if (coverImage && coverImage.startsWith('http')) {
+                // New remote URL provided - download and replace
                 const imageId = await saveExternalImage(coverImage);
                 if (imageId) {
+                    // Cleanup old local image if it exists
+                    if (story.coverImage && story.coverImage.startsWith('/api/images/')) {
+                        const oldId = story.coverImage.split('/').pop();
+                        await deleteFromGridFS(oldId);
+                    }
                     story.coverImage = `/api/images/${imageId}`;
                     updated = true;
                 }

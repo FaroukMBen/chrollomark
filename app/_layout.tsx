@@ -11,10 +11,11 @@ import { ThemeProvider } from '@/store/ThemeContext';
 import { ToastProvider, useToast } from '@/store/ToastContext';
 
 import { useEffect, useMemo } from 'react';
-import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Text, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '@/store/AuthContext';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+
 
 const ChrolloDark = {
 
@@ -53,7 +54,7 @@ function GlobalSocketListener() {
 
   useEffect(() => {
     if (!socket) return;
-    
+
     const onFriendRequest = (data: any) => {
       showToast({ message: `New friend request from ${data.from?.username}`, type: 'info' });
     };
@@ -64,34 +65,34 @@ function GlobalSocketListener() {
 
     const onProgressUpdate = (update: any) => {
       // Show toast if someone moves to a new chapter
-      showToast({ 
+      showToast({
         message: `${update.username} is now on chapter ${update.currentChapter} of ${update.story?.title || 'a story'}`,
-        type: 'info' 
+        type: 'info'
       });
     };
 
     const onReviewUpdate = (data: any) => {
       if (data.isNew) {
-        showToast({ 
+        showToast({
           message: `${data.user?.username} posted a new review for ${data.story?.title}`,
-          type: 'info' 
+          type: 'info'
         });
       }
     };
 
     const onCollectionUpdate = (data: any) => {
       if (data.isNew) {
-        showToast({ 
+        showToast({
           message: `${data.user?.username} created a new collection: ${data.name}`,
-          type: 'info' 
+          type: 'info'
         });
       }
     };
 
     const onRecommendationUpdate = (data: any) => {
-      showToast({ 
+      showToast({
         message: `${data.user?.username} recommended ${data.story?.title}!`,
-        type: 'success' 
+        type: 'success'
       });
     };
 
@@ -118,7 +119,7 @@ function GlobalSocketListener() {
 function RootLayoutInner() {
   const { isLoading: isAuthLoading } = useAuth();
   const colorScheme = useColorScheme();
-  
+
   const theme = useMemo(() => colorScheme === 'dark' ? ChrolloDark : ChrolloLight, [colorScheme]);
   const bgColor = theme.colors.background;
 
@@ -126,10 +127,10 @@ function RootLayoutInner() {
     return (
       <View style={{ flex: 1, backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }}>
         <View style={{ alignItems: 'center', gap: 20 }}>
-          <View style={{ 
-            width: 100, 
-            height: 100, 
-            borderRadius: 30, 
+          <View style={{
+            width: 100,
+            height: 100,
+            borderRadius: 30,
             backgroundColor: theme.colors.primary + '15',
             justifyContent: 'center',
             alignItems: 'center'
@@ -137,11 +138,11 @@ function RootLayoutInner() {
             <IconSymbol name="book.fill" size={48} color={theme.colors.primary} />
           </View>
           <View style={{ alignItems: 'center', gap: 8 }}>
-            <Text style={{ 
-              fontSize: 24, 
-              fontWeight: '800', 
+            <Text style={{
+              fontSize: 24,
+              fontWeight: '800',
               color: theme.colors.text,
-              letterSpacing: -0.5 
+              letterSpacing: -0.5
             }}>ChrolloMark</Text>
             <ActivityIndicator size="small" color={theme.colors.primary} />
           </View>
@@ -156,7 +157,8 @@ function RootLayoutInner() {
         <View style={{ flex: 1, backgroundColor: bgColor }}>
           <ToastProvider>
             <GlobalSocketListener />
-            <Stack screenOptions={{ 
+
+            <Stack screenOptions={{
               headerShown: false,
               contentStyle: { backgroundColor: bgColor },
               animation: 'slide_from_right',
@@ -168,10 +170,6 @@ function RootLayoutInner() {
               />
               <Stack.Screen
                 name="auth/register"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-              />
-              <Stack.Screen
-                name="story/add"
                 options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
               />
               <Stack.Screen name="story/[id]" />

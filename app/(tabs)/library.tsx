@@ -207,7 +207,7 @@ export default function LibraryScreen() {
             {coll.stories.slice(0, 4).map((story: any, idx: number) => (
               <Image
                 key={story._id || idx}
-                source={{ uri: story.coverImage }}
+                source={{ uri: api.resolveImageUrl(story.coverImage) }}
                 style={[
                   styles.previewImg,
                   coll.stories.length === 1 && styles.previewImgFull,

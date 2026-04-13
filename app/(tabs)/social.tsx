@@ -299,7 +299,7 @@ export default function SocialScreen() {
             onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
             activeOpacity={0.8}>
             {item.story?.coverImage ? (
-              <Image source={{ uri: item.story.coverImage }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+              <Image source={{ uri: api.resolveImageUrl(item.story.coverImage) }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
             ) : null}
             {/* Dark gradient overlay */}
             <LinearGradient
@@ -384,7 +384,7 @@ export default function SocialScreen() {
             activeOpacity={0.8}>
             {/* Cover */}
             {item.story?.coverImage ? (
-              <Image source={{ uri: item.story.coverImage }} style={styles.progressCover} contentFit="cover" />
+              <Image source={{ uri: api.resolveImageUrl(item.story.coverImage) }} style={styles.progressCover} contentFit="cover" />
             ) : (
               <View style={[styles.progressCover, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
                 <IconSymbol name="book.fill" size={18} color={colors.textSecondary} />
@@ -462,7 +462,7 @@ export default function SocialScreen() {
             onPress={() => item.story && router.push(`/story/${item.story._id}` as any)}
             activeOpacity={0.8}>
             {item.story?.coverImage ? (
-              <Image source={{ uri: item.story.coverImage }} style={styles.recoCover} contentFit="cover" />
+              <Image source={{ uri: api.resolveImageUrl(item.story.coverImage) }} style={styles.recoCover} contentFit="cover" />
             ) : (
               <View style={[styles.recoCover, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
                 <IconSymbol name="book.fill" size={20} color={colors.textSecondary} />
@@ -534,7 +534,7 @@ export default function SocialScreen() {
                 onPress={() => subItem.story?._id && router.push(`/story/${subItem.story._id}` as any)}
                 activeOpacity={0.8}>
                 {subItem.story?.coverImage ? (
-                  <Image source={{ uri: subItem.story.coverImage }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                  <Image source={{ uri: api.resolveImageUrl(subItem.story.coverImage) }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
                 ) : (
                   <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
                     <IconSymbol name="book.fill" size={16} color={colors.textSecondary} />

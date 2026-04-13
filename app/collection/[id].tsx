@@ -148,9 +148,9 @@ export default function CollectionDetailScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <IconSymbol name="arrow.left" size={24} color={colors.text} />
         </TouchableOpacity>
-        
+
         <View style={styles.headerActions}>
-           {isOwner && (
+          {isOwner && (
             <>
               <TouchableOpacity
                 style={styles.actionBtn}
@@ -228,15 +228,15 @@ export default function CollectionDetailScreen() {
           </TouchableOpacity>
 
           {isOwner && (
-             <TouchableOpacity
-             style={[styles.addStoriesBtn, { backgroundColor: colors.primary }]}
-             onPress={() => {
-               loadLibrary();
-               setIsManageModalVisible(true);
-             }}>
-             <IconSymbol name="plus" size={14} color="#FFF" />
-             <Text style={styles.addStoriesText}>Add Stories</Text>
-           </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addStoriesBtn, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                loadLibrary();
+                setIsManageModalVisible(true);
+              }}>
+              <IconSymbol name="plus" size={14} color="#FFF" />
+              <Text style={styles.addStoriesText}>Add Stories</Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -260,7 +260,7 @@ export default function CollectionDetailScreen() {
               style={[styles.storyItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
               onPress={() => router.push(`/story/${story._id}` as any)}>
               {story.coverImage ? (
-                <Image source={{ uri: story.coverImage }} style={styles.storyCover} contentFit="cover" />
+                <Image source={{ uri: api.resolveImageUrl(story.coverImage) }} style={styles.storyCover} contentFit="cover" />
               ) : (
                 <View style={[styles.storyCover, styles.placeholder, { backgroundColor: colors.surfaceElevated }]}>
                   <IconSymbol name="book.fill" size={24} color={colors.textSecondary} />
@@ -306,7 +306,7 @@ export default function CollectionDetailScreen() {
             </View>
 
             {isLibraryLoading ? (
-               <ActivityIndicator size="small" color={colors.primary} style={{ margin: 20 }} />
+              <ActivityIndicator size="small" color={colors.primary} style={{ margin: 20 }} />
             ) : libraryStories.length === 0 ? (
               <View style={styles.modalEmpty}>
                 <Text style={[styles.modalEmptyText, { color: colors.textSecondary }]}>
@@ -322,7 +322,7 @@ export default function CollectionDetailScreen() {
                   <TouchableOpacity
                     style={[styles.modalItem, { borderColor: colors.border }]}
                     onPress={() => handleAddToCollection(item.story._id)}>
-                    <Image source={{ uri: item.story.coverImage }} style={styles.modalCover} contentFit="cover" />
+                    <Image source={{ uri: api.resolveImageUrl(item.story.coverImage) }} style={styles.modalCover} contentFit="cover" />
                     <View style={styles.modalItemInfo}>
                       <Text style={[styles.modalItemTitle, { color: colors.text }]} numberOfLines={1}>
                         {item.story.title}
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  
+
   // Modal styles
   modalOverlay: {
     flex: 1,

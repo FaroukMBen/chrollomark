@@ -155,7 +155,7 @@ export default function HomeScreen() {
               onPress={() => router.push(`/story/${currentlyReading[0].story._id}` as any)}
               activeOpacity={0.9}>
               <Image 
-                source={{ uri: currentlyReading[0].story.coverImage }} 
+                source={{ uri: api.resolveImageUrl(currentlyReading[0].story.coverImage) }} 
                 style={styles.heroBackground} 
                 contentFit="cover" 
               />
@@ -268,7 +268,7 @@ export default function HomeScreen() {
                   onPress={() => router.push(`/story/${story._id}` as any)}
                   activeOpacity={0.8}>
                   <View style={styles.trendingCoverContainer}>
-                    <Image source={{ uri: story.coverImage }} style={styles.trendingCover} contentFit="cover" />
+                    <Image source={{ uri: api.resolveImageUrl(story.coverImage) }} style={styles.trendingCover} contentFit="cover" />
                     <View style={[styles.popularityBadge, { backgroundColor: colors.surface + 'E6' }]}>
                       <IconSymbol name="plus.circle.fill" size={10} color={colors.primary} />
                       <Text style={[styles.popularityText, { color: colors.text }]}>{Math.round(story.popularityScore)}</Text>
@@ -318,7 +318,7 @@ export default function HomeScreen() {
                     onPress={() => router.push(`/story/${progress.story._id}` as any)}
                     activeOpacity={0.8}>
                     <View>
-                      <Image source={{ uri: progress.story.coverImage }} style={styles.storyCover} contentFit="cover" />
+                      <Image source={{ uri: api.resolveImageUrl(progress.story.coverImage) }} style={styles.storyCover} contentFit="cover" />
                       <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.coverOverlay} />
                       <TouchableOpacity
                         style={[styles.incrementAction, { backgroundColor: colors.primary }]}

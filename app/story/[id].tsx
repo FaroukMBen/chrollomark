@@ -927,7 +927,7 @@ export default function StoryDetailScreen() {
           {/* New Immersive Background */}
           <View style={styles.immersiveHeader}>
             <Image
-              source={{ uri: story.coverImage }}
+              source={{ uri: api.resolveImageUrl(story.coverImage) }}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
               blurRadius={50}
@@ -953,7 +953,7 @@ export default function StoryDetailScreen() {
           <View style={styles.heroLayout}>
             <View style={styles.coverContainer}>
               {story.coverImage ? (
-                <Image source={{ uri: story.coverImage }} style={styles.mainCover} contentFit="cover" />
+                <Image source={{ uri: api.resolveImageUrl(story.coverImage) }} style={styles.mainCover} contentFit="cover" />
               ) : (
                 <View style={[styles.mainCover, { backgroundColor: colors.surfaceElevated, justifyContent: 'center', alignItems: 'center' }]}>
                   <IconSymbol name="book.fill" size={64} color={colors.textSecondary} />
