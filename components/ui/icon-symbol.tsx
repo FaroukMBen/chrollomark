@@ -51,6 +51,8 @@ const MAPPING = {
   // People
   'person.2.fill': 'people',
   'person.crop.circle': 'person',
+  'person.fill': 'person',
+  'person': 'person',
   'person.badge.plus': 'person-add',
   'person.badge.minus': 'person-remove',
   'plus.square.on.square': 'content-copy',
