@@ -10,7 +10,7 @@ const router = express.Router();
 // @desc    Add or update reading progress
 router.post('/', auth, async (req, res) => {
     try {
-        const { storyId, currentChapter, currentSeason, status, notes, isFavorite, rating } = req.body;
+        const { storyId, currentChapter, currentSeason, status, notes, isFavorite, rating, isPrivate } = req.body;
 
         // Verify story exists
         const story = await Story.findById(storyId);
@@ -29,6 +29,7 @@ router.post('/', auth, async (req, res) => {
             if (notes !== undefined) progress.notes = notes;
             if (isFavorite !== undefined) progress.isFavorite = isFavorite;
             if (rating !== undefined) progress.rating = rating;
+            if (isPrivate !== undefined) progress.isPrivate = isPrivate;
             progress.lastReadDate = Date.now();
 
             // Auto-set dates
@@ -49,6 +50,7 @@ router.post('/', auth, async (req, res) => {
                 notes,
                 isFavorite,
                 rating,
+                isPrivate: isPrivate || false,
                 startDate: status === 'Reading' ? Date.now() : null,
             });
 
@@ -59,14 +61,16 @@ router.post('/', auth, async (req, res) => {
         await progress.save();
         await progress.populate('story', 'title coverImage type totalChapters');
 
-        // Emit socket update to friends
-        emitToFriends(req.user._id, 'progress_update', {
-            userId: req.user._id,
-            username: req.user.username,
-            story: progress.story,
-            currentChapter: progress.currentChapter,
-            status: progress.status
-        });
+        // Emit socket update to friends (only if not private)
+        if (!progress.isPrivate) {
+            emitToFriends(req.user._id, 'progress_update', {
+                userId: req.user._id,
+                username: req.user.username,
+                story: progress.story,
+                currentChapter: progress.currentChapter,
+                status: progress.status
+            });
+        }
 
         res.json(progress);
     } catch (error) {
@@ -98,7 +102,8 @@ router.get('/', auth, async (req, res) => {
 // @desc    Get reading statistics
 router.get('/stats', auth, async (req, res) => {
     try {
-        const allProgress = await ReadingProgress.find({ user: req.user._id });
+        const allProgress = await ReadingProgress.find({ user: req.user._id })
+            .populate('story', 'genres type');
 
         const stats = {
             totalStories: allProgress.length,
@@ -109,7 +114,28 @@ router.get('/stats', auth, async (req, res) => {
             dropped: allProgress.filter((p) => p.status === 'Dropped').length,
             totalChaptersRead: allProgress.reduce((sum, p) => sum + p.currentChapter, 0),
             favorites: allProgress.filter((p) => p.isFavorite).length,
+            
+            // Type breakdown
+            mangaCount: allProgress.filter(p => !p.story || p.story.type === 'Manga').length,
+            animeCount: allProgress.filter(p => p.story && p.story.type === 'Anime').length,
+            
+            // Genre breakdown
+            genres: {}
         };
+
+        allProgress.forEach(p => {
+            if (p.story && p.story.genres) {
+                p.story.genres.forEach(genre => {
+                    stats.genres[genre] = (stats.genres[genre] || 0) + 1;
+                });
+            }
+        });
+
+        // Convert genres object to sorted array for easier FE charting
+        stats.genreDistribution = Object.entries(stats.genres)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10); // Top 10 genres
 
         // Recent activity (last 7 days)
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -119,9 +145,11 @@ router.get('/stats', auth, async (req, res) => {
 
         res.json(stats);
     } catch (error) {
+        console.error('Stats error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
+
 
 // @route   PUT /api/progress/:id/increment
 // @desc    Quick increment chapter by 1
@@ -160,15 +188,17 @@ router.put('/:id/increment', auth, async (req, res) => {
         await progress.save();
         await progress.populate('story', 'title coverImage type totalChapters');
 
-        // Emit socket update to friends
-        emitToFriends(req.user._id, 'progress_update', {
-            userId: req.user._id,
-            username: req.user.username,
-            story: progress.story,
-            currentChapter: progress.currentChapter,
-            currentSeason: progress.currentSeason,
-            status: progress.status
-        });
+        // Emit socket update to friends (only if not private)
+        if (!progress.isPrivate) {
+            emitToFriends(req.user._id, 'progress_update', {
+                userId: req.user._id,
+                username: req.user.username,
+                story: progress.story,
+                currentChapter: progress.currentChapter,
+                currentSeason: progress.currentSeason,
+                status: progress.status
+            });
+        }
 
         res.json(progress);
     } catch (error) {
@@ -202,14 +232,16 @@ router.put('/:id/decrement', auth, async (req, res) => {
 
         await progress.populate('story', 'title coverImage type totalChapters');
 
-        // Emit socket update to friends
-        emitToFriends(req.user._id, 'progress_update', {
-            userId: req.user._id,
-            username: req.user.username,
-            story: progress.story,
-            currentChapter: progress.currentChapter,
-            status: progress.status
-        });
+        // Emit socket update to friends (only if not private)
+        if (!progress.isPrivate) {
+            emitToFriends(req.user._id, 'progress_update', {
+                userId: req.user._id,
+                username: req.user.username,
+                story: progress.story,
+                currentChapter: progress.currentChapter,
+                status: progress.status
+            });
+        }
 
         res.json(progress);
     } catch (error) {
@@ -250,7 +282,10 @@ router.get('/user/:userId', auth, async (req, res) => {
             return res.status(403).json({ message: 'You need to be friends to see their progress' });
         }
 
-        const progress = await ReadingProgress.find({ user: req.params.userId })
+        const progress = await ReadingProgress.find({ 
+                user: req.params.userId,
+                isPrivate: { $ne: true } // Hide private stories from friends
+            })
             .sort('-lastReadDate')
             .populate('story', 'title coverImage type totalChapters author status averageRating genres');
 

@@ -278,6 +278,7 @@ class ApiService {
         notes?: string;
         isFavorite?: boolean;
         rating?: number;
+        isPrivate?: boolean;
     }) {
         return this.request<any>('/progress', { method: 'POST', body: data });
     }
@@ -484,6 +485,7 @@ class ApiService {
         totalChapters?: string;
         genres?: string[];
         year?: number;
+        contentRating?: string;
     }) {
         return this.request<{ story: any; created: boolean; updated: boolean }>('/stories/clone-mangadex', {
             method: 'POST',
@@ -548,6 +550,7 @@ class ApiService {
         totalChapters?: number;
         year?: number;
         author?: string;
+        contentRating?: string;
     }) {
         return this.request<{ story: any; created: boolean; updated: boolean }>('/stories/clone-anilist', {
             method: 'POST',

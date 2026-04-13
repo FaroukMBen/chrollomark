@@ -126,12 +126,50 @@ router.get('/manga', auth, async (req, res) => {
         }
 
         const response = await fetch(url.toString());
-        if (!response.ok) {
-            throw new Error(`MangaDex API error: ${response.status}`);
-        }
-
         const data = await response.json();
-        const results = (data.data || []).map(normalizeManga);
+
+        const mongoose = require('mongoose');
+        const Story = mongoose.model('Story');
+
+        let results = (data.data || []).map(normalizeManga);
+
+        // Fusion logic: Match titles with our local DB
+        const titles = results.map(r => r.title);
+        const localMatches = await Story.find({
+            title: { $in: titles }
+        });
+
+        const matchMap = {};
+        const syncStatusMap = {};
+
+        localMatches.forEach(s => {
+            const key = s.title.toLowerCase();
+
+            const result = results.find(r => {
+                if (r.title.toLowerCase() !== key) return false;
+                return s.type !== 'Anime';
+            });
+
+            if (result) {
+                matchMap[key] = s._id;
+
+                const extGenres = result.tags || [];
+                const locGenres = s.genres || [];
+                const hasNewGenres = extGenres.some(g => !locGenres.includes(g));
+                const isDescLonger = (result.description?.length || 0) > (s.description?.length || 0);
+                const isChaptersBetter = (result.lastChapter || 0) > (s.totalChapters || 0);
+                const isAuthorDifferent = result.author && s.author && !s.author.includes(result.author);
+                const isIdMissing = !s.mangadexId;
+
+                syncStatusMap[key] = !hasNewGenres && !isDescLonger && !isChaptersBetter && !isAuthorDifferent && !isIdMissing;
+            }
+        });
+
+        results = results.map(r => ({
+            ...r,
+            chrollomarkId: matchMap[r.title.toLowerCase()] || null,
+            alreadyInSync: syncStatusMap[r.title.toLowerCase()] || false
+        }));
 
         res.json({
             results,
@@ -194,7 +232,7 @@ router.get('/manga/:id/chapters', auth, async (req, res) => {
         const url = new URL(`${MANGADEX_BASE}/manga/${id}/feed`);
         url.searchParams.append('limit', limit);
         url.searchParams.append('offset', offset);
-        
+
         if (translatedLanguage && translatedLanguage !== 'all') {
             translatedLanguage.split(',').forEach(lang => url.searchParams.append('translatedLanguage[]', lang));
         }

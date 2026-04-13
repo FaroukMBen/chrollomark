@@ -17,7 +17,7 @@ const storySchema = new mongoose.Schema(
         },
         description: {
             type: String,
-            maxlength: [2000, 'Description cannot exceed 2000 characters'],
+            maxlength: [10000, 'Description cannot exceed 10000 characters'],
             default: '',
         },
         type: {

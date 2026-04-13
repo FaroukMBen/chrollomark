@@ -55,6 +55,10 @@ const readingProgressSchema = new mongoose.Schema(
             max: 5,
             default: 0,
         },
+        isPrivate: {
+            type: Boolean,
+            default: false,
+        },
     },
     {
         timestamps: true,
