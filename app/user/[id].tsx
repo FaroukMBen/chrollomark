@@ -297,90 +297,93 @@ export default function UserProfileScreen() {
                   </Text>
                 ) : (
                   <View style={viewMode === 'grid' ? styles.gridContainer : viewMode === 'compact' ? styles.compactGrid : null}>
-                    {progress.map((item: any) => (
-                      <TouchableOpacity
-                        key={item._id}
-                        style={[
-                          viewMode === 'list' && [styles.progressItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
-                          viewMode === 'grid' && [styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
-                          viewMode === 'compact' && styles.compactCard
-                        ]}
-                        onPress={() => router.push(`/story/${item.story._id}` as any)}>
-                        
-                        {/* Cover Image */}
-                        <View>
-                          {item.story.coverImage ? (
-                            <Image 
-                              source={{ uri: item.story.coverImage }} 
-                              style={[
+                    {progress.map((item: any) => {
+                      const itemKey = `${viewMode}-${item._id}`;
+                      return (
+                        <TouchableOpacity
+                          key={itemKey}
+                          style={[
+                            viewMode === 'list' && [styles.progressItem, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
+                            viewMode === 'grid' && [styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }],
+                            viewMode === 'compact' && styles.compactCard
+                          ]}
+                          onPress={() => router.push(`/story/${item.story?._id}` as any)}>
+                          
+                          {/* Cover Image */}
+                          <View>
+                            {item.story?.coverImage ? (
+                              <Image 
+                                source={{ uri: item.story.coverImage }} 
+                                style={[
+                                  viewMode === 'list' && styles.listProgressCover,
+                                  viewMode === 'grid' && styles.gridCover,
+                                  viewMode === 'compact' && styles.compactCover,
+                                  { borderColor: colors.cardBorder }
+                                ]} 
+                                contentFit="cover" 
+                              />
+                            ) : (
+                              <View style={[
                                 viewMode === 'list' && styles.listProgressCover,
                                 viewMode === 'grid' && styles.gridCover,
                                 viewMode === 'compact' && styles.compactCover,
-                                { borderColor: colors.cardBorder }
-                              ]} 
-                              contentFit="cover" 
-                            />
-                          ) : (
-                            <View style={[
-                              viewMode === 'list' && styles.listProgressCover,
-                              viewMode === 'grid' && styles.gridCover,
-                              viewMode === 'compact' && styles.compactCover,
-                              styles.placeholderCover, 
-                              { backgroundColor: colors.surfaceElevated }
-                            ]}>
-                              <IconSymbol name="book.fill" size={viewMode === 'compact' ? 20 : 24} color={colors.textSecondary} />
+                                styles.placeholderCover, 
+                                { backgroundColor: colors.surfaceElevated }
+                              ]}>
+                                <IconSymbol name="book.fill" size={viewMode === 'compact' ? 20 : 24} color={colors.textSecondary} />
+                              </View>
+                            )}
+                            
+                            {/* Mutual Badge */}
+                            {item.isMutual && (
+                              <View style={[
+                                styles.mutualBadge, 
+                                { backgroundColor: colors.primary },
+                                viewMode === 'compact' && styles.mutualBadgeMini
+                              ]}>
+                                <IconSymbol name="person.2.fill" size={viewMode === 'compact' ? 8 : 10} color="#FFF" />
+                              </View>
+                            )}
+                          </View>
+  
+                          {/* Info Section */}
+                          {viewMode === 'list' && (
+                            <View style={styles.progressInfo}>
+                              <View style={styles.titleRow}>
+                                <Text style={[styles.progressTitle, { color: colors.text }]} numberOfLines={1}>{item.story?.title}</Text>
+                                {item.isMutual && (
+                                  <View style={[styles.mutualTag, { backgroundColor: colors.primary + '15' }]}>
+                                    <Text style={[styles.mutualTagText, { color: colors.primary }]}>Mutual</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <View style={styles.progressMeta}>
+                                <View style={[styles.statusBadge, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
+                                  <Text style={[styles.statusText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
+                                </View>
+                                <Text style={[styles.chapterText, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
+                              </View>
                             </View>
                           )}
                           
-                          {/* Mutual Badge */}
-                          {item.isMutual && (
-                            <View style={[
-                              styles.mutualBadge, 
-                              { backgroundColor: colors.primary },
-                              viewMode === 'compact' && styles.mutualBadgeMini
-                            ]}>
-                              <IconSymbol name="person.2.fill" size={viewMode === 'compact' ? 8 : 10} color="#FFF" />
+                          {viewMode === 'grid' && (
+                            <View style={styles.gridInfo}>
+                              <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>{item.story?.title}</Text>
+                              <View style={styles.gridMeta}>
+                                <View style={[styles.miniStatusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
+                                <Text style={[styles.gridChapter, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
+                              </View>
                             </View>
                           )}
-                        </View>
-
-                        {/* Info Section */}
-                        {viewMode === 'list' && (
-                          <View style={styles.progressInfo}>
-                            <View style={styles.titleRow}>
-                              <Text style={[styles.progressTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
-                              {item.isMutual && (
-                                <View style={[styles.mutualTag, { backgroundColor: colors.primary + '15' }]}>
-                                  <Text style={[styles.mutualTagText, { color: colors.primary }]}>Mutual</Text>
-                                </View>
-                              )}
-                            </View>
-                            <View style={styles.progressMeta}>
-                              <View style={[styles.statusBadge, { backgroundColor: (StatusColors[item.status] || colors.primary) + '20' }]}>
-                                <Text style={[styles.statusText, { color: StatusColors[item.status] || colors.primary }]}>{item.status}</Text>
-                              </View>
-                              <Text style={[styles.chapterText, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
-                            </View>
-                          </View>
-                        )}
-                        
-                        {viewMode === 'grid' && (
-                          <View style={styles.gridInfo}>
-                            <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={1}>{item.story.title}</Text>
-                            <View style={styles.gridMeta}>
-                              <View style={[styles.miniStatusDot, { backgroundColor: StatusColors[item.status] || colors.primary }]} />
-                              <Text style={[styles.gridChapter, { color: colors.primary }]}>Ch. {item.currentChapter}</Text>
-                            </View>
-                          </View>
-                        )}
-
-                        {viewMode === 'compact' && (
-                          <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
-                            {item.story.title}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    ))}
+  
+                          {viewMode === 'compact' && (
+                            <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
+                              {item.story?.title}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 )}
               </View>
