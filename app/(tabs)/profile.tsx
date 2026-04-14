@@ -182,7 +182,6 @@ export default function ProfileScreen() {
       return;
     }
 
-    console.log('[Update] Starting APK download from:', url);
     setApplyingUpdate(true);
     setDownloadProgress(0);
 
@@ -190,32 +189,33 @@ export default function ProfileScreen() {
       const filename = `chrollomark-update-${Date.now()}.apk`;
       const destination = new File(Paths.cache, filename);
 
-      const result = await File.downloadFileAsync(url, destination);
+      console.log('[Update] Direct APK Download started for:', url);
 
-      if (result && result.exists) {
-        console.log('[Update] Download successful:', result.uri);
+      // We explicitly use the NEW API here
+      const downloadResult = await File.downloadFileAsync(url, destination);
+      
+      if (downloadResult && downloadResult.exists) {
         setDownloadProgress(1);
         
-        const contentUri = await FileSystemLegacy.getContentUriAsync(result.uri);
-        console.log('[Update] Generated Content URI:', contentUri);
+        // Use legacy only for IntentLauncher URI
+        const contentUri = await FileSystemLegacy.getContentUriAsync(downloadResult.uri);
 
         try {
           await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
             data: contentUri,
-            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+            flags: 1,
             type: 'application/vnd.android.package-archive',
           });
-        } catch (intentError) {
-          console.error('[Update] IntentLauncher failed, falling back to Sharing:', intentError);
-          await Sharing.shareAsync(result.uri, {
+        } catch (intentError: any) {
+          console.log('[Update] IntentLauncher failed, using Sharing fallback');
+          await Sharing.shareAsync(downloadResult.uri, {
             mimeType: 'application/vnd.android.package-archive',
-            UTI: 'com.android.package-archive',
           });
         }
       }
     } catch (e: any) {
-      console.error('[Update] APK Update Error:', e);
-      showToast({ message: `Download failed: ${e.message}`, type: 'error' });
+      console.error('[Update] Error:', e);
+      showToast({ message: `Update failed: ${e.message}`, type: 'error' });
     } finally {
       setApplyingUpdate(false);
       setDownloadProgress(0);
@@ -441,7 +441,7 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* ─── STATS OVERVIEW (fixed 4-column grid) ─── */}
+        {/* ─── STATS OVERVIEW ─── */}
         {stats && (
           <>
             <View style={[styles.overviewCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -690,128 +690,37 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xl },
   welcomeTitle: { fontSize: 22, fontWeight: '800', marginTop: Spacing.lg, marginBottom: Spacing.sm },
   scrollContent: { paddingBottom: 100 },
-
-  // Profile Card
-  profileCard: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-  },
+  profileCard: { marginHorizontal: Spacing.lg, marginTop: Spacing.md, padding: Spacing.lg, borderRadius: BorderRadius.xl, borderWidth: 1 },
   profileTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  avatar: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  avatar: { width: 68, height: 68, borderRadius: 34, justifyContent: 'center', alignItems: 'center' },
   avatarImage: { width: '100%', height: '100%', borderRadius: 34 },
   avatarText: { color: '#FFF', fontSize: 26, fontWeight: '800' },
-  editBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFF',
-  },
+  editBadge: { position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFF' },
   profileInfo: { flex: 1 },
   profileName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   profileEmail: { fontSize: 12, marginTop: 2, fontWeight: '500' },
   bio: { fontSize: 13, marginTop: Spacing.md, lineHeight: 18 },
-  viewPublicBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: Spacing.md,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-  },
+  viewPublicBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: Spacing.md, paddingVertical: 10, borderRadius: BorderRadius.md, borderWidth: 1 },
   viewPublicText: { fontSize: 13, fontWeight: '700' },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    position: 'absolute',
-    top: 0,
-    right: 0,
-  },
-  iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  headerRightActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, position: 'absolute', top: 0, right: 0 },
+  iconBtn: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   editSection: { marginTop: Spacing.md, gap: Spacing.sm },
   editInput: { padding: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, fontSize: 14 },
   textArea: { minHeight: 70, textAlignVertical: 'top' },
   editActions: { flexDirection: 'row', gap: Spacing.sm },
   editBtn: { flex: 1, padding: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, alignItems: 'center' },
-
-  // Overview Card — fixed uniform grid
-  overviewCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-  },
-  overviewStat: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  overviewCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: Spacing.lg, marginTop: Spacing.md, paddingVertical: Spacing.md, borderRadius: BorderRadius.xl, borderWidth: 1 },
+  overviewStat: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   overviewValue: { fontSize: 20, fontWeight: '800', textAlign: 'center' },
   overviewLabel: { fontSize: 9, fontWeight: '700', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center' },
   overviewDivider: { width: 1, height: 28 },
-
-  // Status Grid
-  statusGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  statCard: {
-    flexBasis: '30%',
-    flexGrow: 1,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: 4,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    gap: 3,
-  },
+  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: Spacing.lg, gap: Spacing.sm, marginTop: Spacing.md },
+  statCard: { flexBasis: '30%', flexGrow: 1, paddingVertical: Spacing.sm, paddingHorizontal: 4, borderRadius: BorderRadius.lg, alignItems: 'center', borderWidth: 1, gap: 3 },
   statIconBg: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   statValue: { fontSize: 16, fontWeight: '800' },
   statLabel: { fontSize: 9, fontWeight: '600' },
-
-  // Update Card
-  updateCard: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-  },
-  updateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
+  updateCard: { marginHorizontal: Spacing.lg, marginTop: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.xl, borderWidth: 1 },
+  updateHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   updateTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   updateTitle: { fontSize: 15, fontWeight: '700' },
   versionBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: BorderRadius.full },
@@ -820,69 +729,19 @@ const styles = StyleSheet.create({
   changelogItem: { flexDirection: 'row', gap: 6, paddingRight: Spacing.md },
   changelogBullet: { fontSize: 14, fontWeight: '700' },
   changelogText: { fontSize: 12, lineHeight: 17, flex: 1 },
-  updateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.md,
-  },
+  updateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: BorderRadius.md },
   updateBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
-
-  // Section
   section: { paddingHorizontal: Spacing.lg, marginTop: Spacing.xl },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
-  newCollectionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: BorderRadius.full,
-  },
-  newCollectionText: { fontSize: 11, fontWeight: '700' },
-
-
-  // Empty
-  emptyCard: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    gap: 6,
-  },
-  emptyCardText: { fontSize: 13, fontWeight: '600' },
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-
-  // Settings
-  settingCard: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.sm,
-  },
+  settingCard: { padding: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1, marginBottom: Spacing.sm },
   actionCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   settingHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   settingLabel: { fontSize: 13, fontWeight: '600' },
   versionLabel: { fontSize: 12, fontWeight: '500' },
   themeOptions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
-  themeOption: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    gap: 4,
-  },
+  themeOption: { flex: 1, alignItems: 'center', paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, gap: 4 },
   themeText: { fontSize: 11, fontWeight: '600' },
-  mandatoryHint: {
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 8,
-    fontStyle: 'italic',
-    opacity: 0.7
-  },
+  mandatoryHint: { fontSize: 10, textAlign: 'center', marginTop: 8, fontStyle: 'italic', opacity: 0.7 },
 });
