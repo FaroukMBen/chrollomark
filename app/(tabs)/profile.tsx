@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { File, Paths } from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 
@@ -39,7 +40,7 @@ interface UpdateInfo {
   changelog: string[];
   downloadUrl: string;
   mandatory: boolean;
-  isOTA?: boolean; // true when detected via expo-updates
+  isOTA?: boolean;
 }
 
 export default function ProfileScreen() {
@@ -181,6 +182,7 @@ export default function ProfileScreen() {
       return;
     }
 
+    console.log('[Update] Starting APK download from:', url);
     setApplyingUpdate(true);
     setDownloadProgress(0);
 
@@ -190,11 +192,12 @@ export default function ProfileScreen() {
 
       const result = await File.downloadFileAsync(url, destination);
 
-      if (result && result.uri) {
+      if (result && result.exists) {
+        console.log('[Update] Download successful:', result.uri);
         setDownloadProgress(1);
-
-        // Use IntentLauncher to open the APK
-        const contentUri = destination.contentUri;
+        
+        const contentUri = await FileSystemLegacy.getContentUriAsync(result.uri);
+        console.log('[Update] Generated Content URI:', contentUri);
 
         try {
           await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
@@ -203,7 +206,7 @@ export default function ProfileScreen() {
             type: 'application/vnd.android.package-archive',
           });
         } catch (intentError) {
-          // Fallback to Sharing if IntentLauncher fails
+          console.error('[Update] IntentLauncher failed, falling back to Sharing:', intentError);
           await Sharing.shareAsync(result.uri, {
             mimeType: 'application/vnd.android.package-archive',
             UTI: 'com.android.package-archive',
@@ -211,6 +214,7 @@ export default function ProfileScreen() {
         }
       }
     } catch (e: any) {
+      console.error('[Update] APK Update Error:', e);
       showToast({ message: `Download failed: ${e.message}`, type: 'error' });
     } finally {
       setApplyingUpdate(false);
