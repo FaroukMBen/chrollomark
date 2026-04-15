@@ -4,14 +4,16 @@ import { Platform } from 'react-native';
 import { offlineStore } from './offline';
 
 const getBaseUrl = () => {
+    // If an environment variable is provided (e.g. during EAS build), use it first
     if (process.env.EXPO_PUBLIC_API_URL) {
-        return process.env.EXPO_PUBLIC_API_URL;
+        return process.env.EXPO_PUBLIC_API_URL.replace(/\/$/, ''); // Remove trailing slash
     }
 
     if (Platform.OS === 'web') {
         return 'http://localhost:5000';
     }
 
+    // In Expo Go / Development
     if (__DEV__) {
         const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost;
         if (hostUri) {
@@ -20,7 +22,8 @@ const getBaseUrl = () => {
         }
     }
 
-    return 'https://api.chrollomark.com';
+    // Fallback for production APK
+    return 'https://chrollomark.vercel.app';
 };
 
 const BASE_URL = getBaseUrl();
@@ -35,15 +38,21 @@ class ApiService {
 
     resolveImageUrl(path: string | null | undefined): string {
         if (!path) return '';
-        
-        // Handle local GridFS paths
-        if (path.startsWith('/api/images/')) {
-            return `${BASE_URL}${path}`;
+
+        // If it's already a full URL check if it's one of ours
+        if (path.startsWith('http')) {
+            const imageMarker = '/api/images/';
+            if (path.includes(imageMarker)) {
+                const parts = path.split(imageMarker);
+                const relativePath = `${imageMarker}${parts[1]}`;
+                return `${BASE_URL}${relativePath}`;
+            }
+            return path;
         }
         
-        // Use direct external links by default to save server IP
-        if (path.startsWith('http')) {
-            return path;
+        // Handle relative local GridFS paths
+        if (path.startsWith('/api/images/')) {
+            return `${BASE_URL}${path}`;
         }
         
         return path;

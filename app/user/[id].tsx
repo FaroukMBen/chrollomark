@@ -170,7 +170,7 @@ export default function UserProfileScreen() {
           {/* Core Profile Info */}
           <View style={styles.heroInfoContent}>
             {profile.user?.avatar ? (
-              <Image source={{ uri: profile.user.avatar }} style={[styles.heroAvatar, { borderColor: colors.primary }]} contentFit="cover" />
+              <Image source={{ uri: api.resolveImageUrl(profile.user.avatar) }} style={[styles.heroAvatar, { borderColor: colors.primary }]} contentFit="cover" />
             ) : (
               <View style={[styles.heroAvatar, { backgroundColor: colors.primary, borderColor: colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
                 <Text style={styles.heroAvatarText}>{profile.user?.username?.[0]?.toUpperCase()}</Text>
@@ -524,7 +524,7 @@ export default function UserProfileScreen() {
                     router.push(`/user/${friend._id}` as any);
                   }}>
                   {friend.avatar ? (
-                    <Image source={{ uri: friend.avatar }} style={styles.avatarMini} contentFit="cover" />
+                    <Image source={{ uri: api.resolveImageUrl(friend.avatar) }} style={styles.avatarMini} contentFit="cover" />
                   ) : (
                     <View style={[styles.avatarMini, { backgroundColor: colors.primary + '30' }]}>
                       <Text style={[styles.avatarMiniText, { color: colors.primary }]}>{friend.username?.[0]?.toUpperCase()}</Text>

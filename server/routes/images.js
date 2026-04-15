@@ -47,6 +47,8 @@ router.get('/:id', async (req, res) => {
         }
 
         res.set('Content-Type', files[0].contentType);
+        res.set('Content-Length', files[0].length);
+        res.set('Cache-Control', 'public, max-age=31536000'); // Cache locally for 1 year
         const downloadStream = bucket.openDownloadStream(id);
         
         downloadStream.on('error', (err) => {

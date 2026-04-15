@@ -113,7 +113,7 @@ router.put('/profile', [auth, upload.single('avatar')], async (req, res) => {
             }
 
             const imageId = await uploadToGridFS(req.file.buffer, req.file);
-            avatarUrl = `${req.protocol}://${req.get('host')}/api/images/${imageId}`;
+            avatarUrl = `/api/images/${imageId}`;
         }
 
         if (username) {

@@ -31,7 +31,7 @@ import { useAuth } from '@/store/AuthContext';
 import { useTheme } from '@/store/ThemeContext';
 import { useToast } from '@/store/ToastContext';
 
-// ─── App Update System (OTA via expo-updates + changelog from version.json) ───
+// ─── We will rework all the update ───
 const APP_VERSION = '3.0.3';
 const CHANGELOG_URL = 'https://raw.githubusercontent.com/FaroukMBen/chrollomark/main/version.json';
 
@@ -161,12 +161,10 @@ export default function ProfileScreen() {
   const applyOTAUpdate = async () => {
     setApplyingUpdate(true);
     try {
-      // First, fetch the actual bundle
       await Updates.fetchUpdateAsync();
 
       showToast({ message: 'Update downloaded! Restarting...', type: 'success' });
 
-      // Give the user a 2-second buffer to see the success state
       setTimeout(async () => {
         await Updates.reloadAsync();
       }, 2000);
@@ -191,13 +189,11 @@ export default function ProfileScreen() {
 
       console.log('[Update] Direct APK Download started for:', url);
 
-      // We explicitly use the NEW API here
       const downloadResult = await File.downloadFileAsync(url, destination);
-      
+
       if (downloadResult && downloadResult.exists) {
         setDownloadProgress(1);
-        
-        // Use legacy only for IntentLauncher URI
+
         const contentUri = await FileSystemLegacy.getContentUriAsync(downloadResult.uri);
 
         try {
@@ -245,7 +241,6 @@ export default function ProfileScreen() {
 
               setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
 
-              // If mandatory, update itself (download and prompt)
               if (mandatory) {
                 await Updates.fetchUpdateAsync();
                 Alert.alert(
@@ -265,7 +260,7 @@ export default function ProfileScreen() {
         if (data.version && data.version !== APP_VERSION) {
           setUpdateInfo({ ...data, isOTA: false });
         }
-      } catch { /* silent */ }
+      } catch { }
     })();
   }, [isAuthenticated, APP_VERSION]);
 
@@ -307,8 +302,7 @@ export default function ProfileScreen() {
           const filename = editAvatar.split('/').pop() || 'avatar.jpg';
           const match = /\.(\w+)$/.exec(filename);
           const fileType = match ? `image/${match[1]}` : 'image';
-          // @ts-ignore
-          formData.append('avatar', { uri: editAvatar, name: filename, type: fileType });
+          formData.append('avatar', { uri: editAvatar, name: filename, type: fileType } as any);
         } else {
           formData.append('avatar', editAvatar.trim());
         }
@@ -363,7 +357,7 @@ export default function ProfileScreen() {
             {isEditing ? (
               <TouchableOpacity onPress={pickImage} style={[styles.avatar, { backgroundColor: colors.primary }]}>
                 {editAvatar ? (
-                  <Image source={{ uri: editAvatar }} style={styles.avatarImage} contentFit="cover" />
+                  <Image source={{ uri: api.resolveImageUrl(editAvatar) }} style={styles.avatarImage} contentFit="cover" />
                 ) : (
                   <IconSymbol name="photo" size={28} color="#FFF" />
                 )}
@@ -374,7 +368,7 @@ export default function ProfileScreen() {
             ) : (
               <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
                 {user?.avatar ? (
-                  <Image source={{ uri: user.avatar }} style={styles.avatarImage} contentFit="cover" />
+                  <Image source={{ uri: api.resolveImageUrl(user.avatar) }} style={styles.avatarImage} contentFit="cover" />
                 ) : (
                   <Text style={styles.avatarText}>{user?.username?.[0]?.toUpperCase()}</Text>
                 )}

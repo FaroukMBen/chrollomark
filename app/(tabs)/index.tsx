@@ -141,7 +141,7 @@ export default function HomeScreen() {
               style={[styles.profileButton, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
               onPress={() => router.push('/(tabs)/profile')}>
               <Image 
-                source={user?.avatar ? { uri: user.avatar } : undefined} 
+                source={user?.avatar ? { uri: api.resolveImageUrl(user.avatar) } : undefined} 
                 style={styles.avatarMini}
                 contentFit="cover"
               />

@@ -249,7 +249,7 @@ export default function SocialScreen() {
   // ─── Shared avatar block ───
   const ActivityAvatar = ({ user, accentColor }: { user: any; accentColor: string }) => (
     user?.avatar ? (
-      <Image source={{ uri: user.avatar }} style={styles.feedAvatar} contentFit="cover" />
+      <Image source={{ uri: api.resolveImageUrl(user.avatar) }} style={styles.feedAvatar} contentFit="cover" />
     ) : (
       <View style={[styles.feedAvatar, { backgroundColor: accentColor + '25', borderWidth: 1.5, borderColor: accentColor + '50' }]}>
         <Text style={[styles.feedAvatarText, { color: accentColor }]}>
@@ -840,7 +840,7 @@ export default function SocialScreen() {
                       }}
                       activeOpacity={0.7}>
                       {friend.avatar ? (
-                        <Image source={{ uri: friend.avatar }} style={styles.avatar} contentFit="cover" />
+                        <Image source={{ uri: api.resolveImageUrl(friend.avatar) }} style={styles.avatar} contentFit="cover" />
                       ) : (
                         <View style={[styles.avatar, { backgroundColor: colors.primary + '30' }]}>
                           <Text style={[styles.avatarText, { color: colors.primary }]}>
@@ -912,7 +912,7 @@ export default function SocialScreen() {
                       key={request._id}
                       style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                       {request.from.avatar ? (
-                        <Image source={{ uri: request.from.avatar }} style={styles.avatar} contentFit="cover" />
+                        <Image source={{ uri: api.resolveImageUrl(request.from.avatar) }} style={styles.avatar} contentFit="cover" />
                       ) : (
                         <View style={[styles.avatar, { backgroundColor: colors.accent + '30' }]}>
                           <Text style={[styles.avatarText, { color: colors.accent }]}>
@@ -960,7 +960,7 @@ export default function SocialScreen() {
                       key={request._id}
                       style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                       {request.to.avatar ? (
-                        <Image source={{ uri: request.to.avatar }} style={styles.avatar} contentFit="cover" />
+                        <Image source={{ uri: api.resolveImageUrl(request.to.avatar) }} style={styles.avatar} contentFit="cover" />
                       ) : (
                         <View style={[styles.avatar, { backgroundColor: colors.primary + '30' }]}>
                           <Text style={[styles.avatarText, { color: colors.primary }]}>
@@ -1039,7 +1039,7 @@ export default function SocialScreen() {
                     key={user._id}
                     style={[styles.userCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.cardBorder }]}>
                     {user.avatar ? (
-                      <Image source={{ uri: user.avatar }} style={styles.avatar} contentFit="cover" />
+                      <Image source={{ uri: api.resolveImageUrl(user.avatar) }} style={styles.avatar} contentFit="cover" />
                     ) : (
                       <View style={[styles.avatar, { backgroundColor: colors.primary + '30' }]}>
                         <Text style={[styles.avatarText, { color: colors.primary }]}>{user.username?.[0]?.toUpperCase()}</Text>

@@ -1259,7 +1259,7 @@ export default function StoryDetailScreen() {
                   return (
                     <View key={fp._id} style={[styles.friendProgressCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                       {fp.user?.avatar ? (
-                        <Image source={{ uri: fp.user.avatar }} style={styles.friendAvatar} contentFit="cover" />
+                        <Image source={{ uri: api.resolveImageUrl(fp.user.avatar) }} style={styles.friendAvatar} contentFit="cover" />
                       ) : (
                         <View style={[styles.friendAvatar, { backgroundColor: colors.primary + '15' }]}>
                           <Text style={[styles.avatarLetter, { color: colors.primary, fontSize: 14 }]}>
@@ -1562,7 +1562,7 @@ export default function StoryDetailScreen() {
                               borderColor: colors.border
                             }}>
                               {review.user?.avatar ? (
-                                <Image source={{ uri: review.user.avatar }} style={{ width: '100%', height: '100%' }} />
+                                <Image source={{ uri: api.resolveImageUrl(review.user.avatar) }} style={{ width: '100%', height: '100%' }} />
                               ) : (
                                 <View style={{ width: '100%', height: '100%', backgroundColor: (isMine ? colors.primary : colors.textSecondary) + '10', justifyContent: 'center', alignItems: 'center' }}>
                                   <Text style={{ fontSize: 14, fontWeight: '900', color: isMine ? colors.primary : colors.textSecondary }}>

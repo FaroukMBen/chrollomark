@@ -74,7 +74,7 @@ const storySchema = new mongoose.Schema(
                 ref: 'User',
             }
         ],
-        mangadexId: { //in the futur we will compare using the title itself, for now and because it is esier :) we will do it using the mangadex id
+        mangadexId: {
             type: String,
             default: null,
             index: true,
