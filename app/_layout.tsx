@@ -9,6 +9,7 @@ import { AuthProvider } from '@/store/AuthContext';
 import { SocketProvider, useSocket } from '@/store/SocketContext';
 import { ThemeProvider } from '@/store/ThemeContext';
 import { ToastProvider, useToast } from '@/store/ToastContext';
+import { UpdateProvider } from '@/store/UpdateContext';
 
 import { useEffect, useMemo } from 'react';
 import { ActivityIndicator, View, StyleSheet, Text, Platform } from 'react-native';
@@ -156,40 +157,42 @@ function RootLayoutInner() {
       <NavThemeProvider value={theme}>
         <View style={{ flex: 1, backgroundColor: bgColor }}>
           <ToastProvider>
-            <GlobalSocketListener />
+            <UpdateProvider>
+              <GlobalSocketListener />
 
-            <Stack screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: bgColor },
-              animation: 'slide_from_right',
-            }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen
-                name="auth/login"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-              />
-              <Stack.Screen
-                name="auth/register"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-              />
-              <Stack.Screen name="story/[id]" />
-              <Stack.Screen
-                name="collection/create"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-              />
-              <Stack.Screen name="collection/[id]" />
-              <Stack.Screen name="user/[id]" />
-              <Stack.Screen name="profile/dev-log" />
-              <Stack.Screen
-                name="profile/feedback"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-              />
-              <Stack.Screen
-                name="profile/report-bug"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-              />
-              <Stack.Screen name="profile/admin" />
-            </Stack>
+              <Stack screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: bgColor },
+                animation: 'slide_from_right',
+              }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen
+                  name="auth/login"
+                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                />
+                <Stack.Screen
+                  name="auth/register"
+                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                />
+                <Stack.Screen name="story/[id]" />
+                <Stack.Screen
+                  name="collection/create"
+                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                />
+                <Stack.Screen name="collection/[id]" />
+                <Stack.Screen name="user/[id]" />
+                <Stack.Screen name="profile/dev-log" />
+                <Stack.Screen
+                  name="profile/feedback"
+                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                />
+                <Stack.Screen
+                  name="profile/report-bug"
+                  options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                />
+                <Stack.Screen name="profile/admin" />
+              </Stack>
+            </UpdateProvider>
           </ToastProvider>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         </View>

@@ -20,9 +20,11 @@ import { BorderRadius, Colors, Shadows, Spacing, StatusColors } from '@/constant
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { api } from '@/services/api';
 import { useAuth } from '@/store/AuthContext';
+import { useUpdate } from '@/store/UpdateContext';
 
 export default function HomeScreen() {
   const { user, isAuthenticated } = useAuth();
+  const { updateInfo } = useUpdate();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
@@ -145,6 +147,19 @@ export default function HomeScreen() {
                 style={styles.avatarMini}
                 contentFit="cover"
               />
+              {updateInfo && (
+                <View style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: '#FF6740',
+                  borderWidth: 2,
+                  borderColor: colors.surface,
+                }} />
+              )}
             </TouchableOpacity>
           </View>
 

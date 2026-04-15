@@ -3,7 +3,6 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import * as Updates from 'expo-updates';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -18,10 +17,7 @@ import {
   Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { File, Paths } from 'expo-file-system';
-import * as FileSystemLegacy from 'expo-file-system/legacy';
-import * as IntentLauncher from 'expo-intent-launcher';
-import * as Sharing from 'expo-sharing';
+import { useUpdate } from '@/store/UpdateContext';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BorderRadius, Colors, Spacing, StatusColors } from '@/constants/theme';
@@ -31,17 +27,7 @@ import { useAuth } from '@/store/AuthContext';
 import { useTheme } from '@/store/ThemeContext';
 import { useToast } from '@/store/ToastContext';
 
-// ─── We will rework all the update ───
-const APP_VERSION = '3.0.3';
-const CHANGELOG_URL = 'https://raw.githubusercontent.com/FaroukMBen/chrollomark/main/version.json';
-
-interface UpdateInfo {
-  version: string;
-  changelog: string[];
-  downloadUrl: string;
-  mandatory: boolean;
-  isOTA?: boolean;
-}
+// ─── Profile Screen ───
 
 export default function ProfileScreen() {
   const { user, isAuthenticated, logout, updateUser } = useAuth();
@@ -60,11 +46,16 @@ export default function ProfileScreen() {
   const [editAvatar, setEditAvatar] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Update system
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [applyingUpdate, setApplyingUpdate] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  const {
+    updateInfo,
+    checkingUpdate,
+    applyingUpdate,
+    downloadProgress,
+    checkForUpdates,
+    applyUpdate,
+    APP_VERSION
+  } = useUpdate();
+
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
 
   useEffect(() => {
@@ -97,172 +88,7 @@ export default function ProfileScreen() {
     setRefreshing(false);
   };
 
-  const checkForUpdates = async () => {
-    setCheckingUpdate(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-    try {
-      // Native check
-      if (!__DEV__) {
-        try {
-          const update = await Updates.checkForUpdateAsync();
-          if (update.isAvailable) {
-            const r = await fetch(CHANGELOG_URL, {
-              cache: 'no-cache',
-              signal: controller.signal,
-              headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
-            });
-            const d = await r.json();
-            setUpdateInfo({
-              version: d.version || 'New',
-              changelog: d.changelog || [],
-              downloadUrl: d.downloadUrl || '',
-              mandatory: d.mandatory || false,
-              isOTA: true
-            });
-            if (d.mandatory) applyOTAUpdate();
-            clearTimeout(timeoutId);
-            setCheckingUpdate(false);
-            return;
-          }
-        } catch (e) {
-          console.log('Native updates unavailable:', e);
-        }
-      }
-
-      // Fallback
-      const response = await fetch(CHANGELOG_URL, {
-        cache: 'no-cache',
-        signal: controller.signal,
-        headers: { 'Pragma': 'no-cache', 'Cache-Control': 'no-cache' }
-      });
-      if (!response.ok) throw new Error(`Server returned ${response.status}`);
-
-      const data: UpdateInfo = await response.json();
-      if (data.version && data.version !== APP_VERSION) {
-        setUpdateInfo({ ...data, isOTA: false });
-      } else {
-        showToast({ message: 'You are on the latest version (v' + APP_VERSION + ')', type: 'success' });
-        setUpdateInfo(null);
-      }
-    } catch (err: any) {
-      const msg = err.name === 'AbortError' ? 'Request timed out' : err.message;
-      showToast({
-        message: __DEV__ ? 'Dev Skip: ' + msg : 'Update error: ' + msg,
-        type: 'error'
-      });
-    } finally {
-      clearTimeout(timeoutId);
-      setCheckingUpdate(false);
-    }
-  };
-
-  const applyOTAUpdate = async () => {
-    setApplyingUpdate(true);
-    try {
-      await Updates.fetchUpdateAsync();
-
-      showToast({ message: 'Update downloaded! Restarting...', type: 'success' });
-
-      setTimeout(async () => {
-        await Updates.reloadAsync();
-      }, 2000);
-    } catch (e: any) {
-      showToast({ message: `Update failed: ${e.message}. Try manual download.`, type: 'error' });
-      setApplyingUpdate(false);
-    }
-  };
-
-  const downloadAndInstallAPK = async (url: string) => {
-    if (Platform.OS !== 'android') {
-      Linking.openURL(url);
-      return;
-    }
-
-    setApplyingUpdate(true);
-    setDownloadProgress(0);
-
-    try {
-      const filename = `chrollomark-update-${Date.now()}.apk`;
-      const destination = new File(Paths.cache, filename);
-
-      console.log('[Update] Direct APK Download started for:', url);
-
-      const downloadResult = await File.downloadFileAsync(url, destination);
-
-      if (downloadResult && downloadResult.exists) {
-        setDownloadProgress(1);
-
-        const contentUri = await FileSystemLegacy.getContentUriAsync(downloadResult.uri);
-
-        try {
-          await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
-            data: contentUri,
-            flags: 1,
-            type: 'application/vnd.android.package-archive',
-          });
-        } catch (intentError: any) {
-          console.log('[Update] IntentLauncher failed, using Sharing fallback');
-          await Sharing.shareAsync(downloadResult.uri, {
-            mimeType: 'application/vnd.android.package-archive',
-          });
-        }
-      }
-    } catch (e: any) {
-      console.error('[Update] Error:', e);
-      showToast({ message: `Update failed: ${e.message}`, type: 'error' });
-    } finally {
-      setApplyingUpdate(false);
-      setDownloadProgress(0);
-    }
-  };
-
-
-  // Auto-check on mount (silent, no error toast)
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    (async () => {
-      try {
-        if (!__DEV__) {
-          try {
-            const update = await Updates.checkForUpdateAsync();
-            if (update.isAvailable) {
-              let changelog: string[] = [];
-              let version = 'New';
-              let mandatory = false;
-              try {
-                const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
-                const d = await r.json();
-                changelog = d.changelog || [];
-                version = d.version || 'New';
-                mandatory = d.mandatory || false;
-              } catch { /* */ }
-
-              setUpdateInfo({ version, changelog, downloadUrl: '', mandatory, isOTA: true });
-
-              if (mandatory) {
-                await Updates.fetchUpdateAsync();
-                Alert.alert(
-                  "Mandatory Update",
-                  "A critical update (v" + version + ") has been downloaded and is required to continue.",
-                  [{ text: "Restart Now", onPress: () => Updates.reloadAsync() }]
-                );
-              }
-              return;
-            }
-          } catch (e) {
-            console.log('Silent update check failed:', e);
-          }
-        }
-        const r = await fetch(CHANGELOG_URL, { cache: 'no-cache' });
-        const data = await r.json();
-        if (data.version && data.version !== APP_VERSION) {
-          setUpdateInfo({ ...data, isOTA: false });
-        }
-      } catch { }
-    })();
-  }, [isAuthenticated, APP_VERSION]);
 
   const handleLogout = () => {
     setIsLogoutConfirmVisible(true);
@@ -506,13 +332,7 @@ export default function ProfileScreen() {
                 { backgroundColor: updateInfo.mandatory ? colors.error : colors.primary, opacity: applyingUpdate ? 0.6 : 1 }
               ]}
               disabled={applyingUpdate}
-              onPress={() => {
-                if (updateInfo.isOTA) {
-                  applyOTAUpdate();
-                } else if (updateInfo.downloadUrl) {
-                  downloadAndInstallAPK(updateInfo.downloadUrl);
-                }
-              }}>
+              onPress={() => applyUpdate()}>,StartLine:509,TargetContent:
               <IconSymbol name={applyingUpdate ? "arrow.2.circlepath" : (updateInfo.isOTA ? "sparkles" : "arrow.down.doc.fill")} size={14} color="#FFF" />
               <Text style={styles.updateBtnText}>
                 {applyingUpdate ? (downloadProgress > 0 ? `Downloading ${Math.round(downloadProgress * 100)}%` : 'Implementing Changes...') :
@@ -631,7 +451,7 @@ export default function ProfileScreen() {
           {/* Check for Updates */}
           <TouchableOpacity
             style={[styles.settingCard, styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
-            onPress={checkForUpdates}
+            onPress={() => checkForUpdates(true)}
             disabled={checkingUpdate}>
             <View style={styles.settingHeader}>
               <IconSymbol name="sparkles" size={15} color="#FF6740" />
